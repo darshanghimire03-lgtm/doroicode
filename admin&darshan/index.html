@@ -220,6 +220,13 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 .match.live { border-color: var(--primary); }
 .match.ended { opacity: 0.6; }
+.match-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  text-align: center;
+  color: var(--text);
+  word-break: break-word;
+}
 .match-teams {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -313,7 +320,11 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   <section class="panel" id="panel-matches">
     <div class="card form-card">
       <div class="card-top">
-        <span class="slot" id="formTitle">New match</span>
+        <span class="slot" id="formTitle">Match details</span>
+      </div>
+      <div>
+        <label for="matchSelect">Select match</label>
+        <select id="matchSelect"></select>
       </div>
       <div class="vs-row">
         <div>
@@ -327,14 +338,17 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
         </div>
       </div>
       <div>
-        <label for="startTime">Start time</label>
+        <label for="matchTitle">Title</label>
+        <input id="matchTitle" type="text" placeholder="e.g. NPL 2026 - Qualifier 1" autocomplete="off" maxlength="80">
+      </div>
+      <div>
+        <label for="startTime">Time</label>
         <input id="startTime" type="datetime-local">
       </div>
-      <div class="links-title">Match links</div>
+      <div class="links-title">Match links (max 8)</div>
       <div class="links-box" id="linksBox"></div>
       <div class="row">
-        <button class="btn-primary" id="saveMatch">Add match</button>
-        <button class="btn-ghost" id="cancelEdit" style="display:none">Cancel</button>
+        <button class="btn-primary" id="saveMatch">Save match</button>
       </div>
     </div>
 
@@ -365,7 +379,7 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 const TOTAL = 8;
-const LINK_COUNT = 5;
+const LINK_COUNT = 8;
 const LIVE_MS = (4 * 60 + 30) * 60 * 1000;
 const grid = document.getElementById("grid");
 const statusEl = document.getElementById("status");
@@ -376,7 +390,8 @@ const teamB = document.getElementById("teamB");
 const startTime = document.getElementById("startTime");
 const linksBox = document.getElementById("linksBox");
 const saveMatchBtn = document.getElementById("saveMatch");
-const cancelEditBtn = document.getElementById("cancelEdit");
+const matchSelect = document.getElementById("matchSelect");
+const matchTitle = document.getElementById("matchTitle");
 const formTitle = document.getElementById("formTitle");
 const matchList = document.getElementById("matchList");
 
@@ -568,6 +583,41 @@ function fillTeamSelects() {
   teamB.value = prevB;
 }
 
+function matchOptionLabel(id, m) {
+  const head = m.title ? m.title + " - " : "";
+  return head + teamLabel(m.team1) + " vs " + teamLabel(m.team2) + " (" + formatTime(m.startTime) + ")";
+}
+
+function fillMatchSelect() {
+  const prev = editingId;
+  const entries = Object.entries(matchesData)
+    .filter(([, m]) => m && typeof m.startTime === "number")
+    .sort((a, b) => a[1].startTime - b[1].startTime);
+  const options = ['<option value="">+ New match</option>'];
+  entries.forEach(([id, m]) => {
+    options.push(`<option value="${escapeHtml(id)}">${escapeHtml(matchOptionLabel(id, m))}</option>`);
+  });
+  matchSelect.innerHTML = options.join("");
+  matchSelect.value = prev && matchesData[prev] ? prev : "";
+}
+
+function loadMatchIntoForm(id) {
+  const m = matchesData[id];
+  if (!m) {
+    resetForm();
+    return;
+  }
+  editingId = id;
+  matchSelect.value = id;
+  teamA.value = m.team1;
+  teamB.value = m.team2;
+  matchTitle.value = m.title || "";
+  startTime.value = toLocalInput(m.startTime);
+  fillLinks(m.links);
+  saveMatchBtn.textContent = "Update match";
+  formTitle.textContent = "Edit match";
+}
+
 function toLocalInput(ms) {
   const d = new Date(ms);
   const pad = (n) => String(n).padStart(2, "0");
@@ -684,6 +734,7 @@ function renderMatches() {
       `;
     return `
       <div class="match ${state === "live" ? "live" : ""} ${state === "ended" ? "ended" : ""}" data-id="${id}">
+        ${m.title ? `<div class="match-title">${escapeHtml(m.title)}</div>` : ""}
         <div class="match-teams">
           ${teamBlock(m.team1)}
           <div class="match-vs">VS</div>
@@ -703,13 +754,14 @@ function renderMatches() {
 
 function resetForm() {
   editingId = null;
+  matchSelect.value = "";
   teamA.value = "";
   teamB.value = "";
+  matchTitle.value = "";
   startTime.value = "";
   fillLinks(null);
-  saveMatchBtn.textContent = "Add match";
+  saveMatchBtn.textContent = "Save match";
   formTitle.textContent = "New match";
-  cancelEditBtn.style.display = "none";
 }
 
 async function saveMatch() {
@@ -732,6 +784,7 @@ async function saveMatch() {
     setStatus("Invalid start time", "err");
     return;
   }
+  const title = matchTitle.value.trim();
   const links = readLinks();
   for (const key of Object.keys(links)) {
     if (!isValidUrl(links[key])) {
@@ -739,7 +792,7 @@ async function saveMatch() {
       return;
     }
   }
-  const data = { team1: t1, team2: t2, startTime: ms, links: links, ended: null, winner: null };
+  const data = { team1: t1, team2: t2, title: title, startTime: ms, links: links, ended: null, winner: null };
   if (editingId && matchesData[editingId] && matchesData[editingId].ended === true && ms <= Date.now()) {
     data.ended = true;
     const prev = matchesData[editingId].winner;
@@ -762,7 +815,10 @@ async function saveMatch() {
 }
 
 saveMatchBtn.addEventListener("click", saveMatch);
-cancelEditBtn.addEventListener("click", resetForm);
+matchSelect.addEventListener("change", () => {
+  if (matchSelect.value) loadMatchIntoForm(matchSelect.value);
+  else resetForm();
+});
 
 matchList.addEventListener("click", async (e) => {
   const editBtn = e.target.closest("[data-edit]");
@@ -794,17 +850,7 @@ matchList.addEventListener("click", async (e) => {
     renderMatches();
   }
   if (editBtn) {
-    const id = editBtn.dataset.edit;
-    const m = matchesData[id];
-    if (!m) return;
-    editingId = id;
-    teamA.value = m.team1;
-    teamB.value = m.team2;
-    startTime.value = toLocalInput(m.startTime);
-    fillLinks(m.links);
-    saveMatchBtn.textContent = "Update match";
-    formTitle.textContent = "Edit match";
-    cancelEditBtn.style.display = "block";
+    loadMatchIntoForm(editBtn.dataset.edit);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
   if (delBtn) {
@@ -839,6 +885,7 @@ onValue(
       }
     }
     fillTeamSelects();
+    fillMatchSelect();
     renderMatches();
     setStatus("Connected", "ok");
   },
@@ -849,6 +896,8 @@ onValue(
   ref(db, "matches"),
   (snap) => {
     matchesData = snap.val() || {};
+    if (editingId && !matchesData[editingId]) resetForm();
+    fillMatchSelect();
     renderMatches();
   },
   (err) => setStatus("Read failed: " + err.message, "err")

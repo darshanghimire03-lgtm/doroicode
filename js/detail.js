@@ -1,13 +1,12 @@
 import { db, ref, onValue } from "/js/firebase-config.js";
 import { mountLayout } from "/js/layout.js";
-import { initAuth } from "/js/auth.js";
+import { createPoll } from "/js/poll.js";
 
 await mountLayout();
-initAuth();
 
 document.getElementById("headerExtra").innerHTML = '<button class="share-btn" id="shareBtn" type="button" hidden aria-label="Share match"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg><span>Share</span></button>';
 
-const LINK_COUNT = 5;
+const LINK_COUNT = 8;
 const LIVE_MS = (4 * 60 + 30) * 60 * 1000;
 const detail = document.getElementById("detail");
 const shareBtn = document.getElementById("shareBtn");
@@ -31,6 +30,7 @@ function getMatchId() {
 }
 
 const matchId = getMatchId();
+const poll = matchId ? createPoll(matchId) : null;
 
 let teamsData = {};
 let match = null;
@@ -111,7 +111,7 @@ function teamName(id) {
 async function shareMatch() {
   if (!match || !matchId) return;
   const url = location.origin + "/match/" + encodeURIComponent(matchId);
-  const title = teamName(match.team1) + " vs " + teamName(match.team2);
+  const title = match.title ? String(match.title) : teamName(match.team1) + " vs " + teamName(match.team2);
   const text = title + " - Watch live on NPLcode";
   if (navigator.share) {
     try {
@@ -261,7 +261,14 @@ function render() {
 
   const t1 = teamsData[match.team1];
   const t2 = teamsData[match.team2];
-  document.title = (t1 && t1.name ? t1.name : "TBD") + " vs " + (t2 && t2.name ? t2.name : "TBD") + " - NPLcode";
+  const vsText = (t1 && t1.name ? t1.name : "TBD") + " vs " + (t2 && t2.name ? t2.name : "TBD");
+  const mainTitle = match.title ? String(match.title) : "";
+  document.title = (mainTitle || vsText) + " - NPLcode";
+  const titleHtml = mainTitle
+    ? `<h1 style="text-align:center;font-size:clamp(1.5rem,6vw,2.4rem);font-weight:900;letter-spacing:-0.03em;line-height:1.1;margin:0 0 18px;word-break:break-word">${esc(mainTitle)}</h1>`
+    : "";
+
+  if (poll) poll.setTeams(t1, t2, info.state === "ended");
 
   const linksHtml = info.state === "ended"
     ? '<div class="empty">This match has ended</div>'
@@ -269,6 +276,7 @@ function render() {
 
   detail.innerHTML = `
     <div class="match-card ${info.state === "live" ? "live" : ""}">
+      ${titleHtml}
       <div class="teams">
         ${teamHtml(match.team1, winnerId === match.team1)}
         <div class="vs">VS</div>
@@ -279,9 +287,11 @@ function render() {
         <div class="when">${esc(formatTime(match.startTime))} &middot; ${esc(whenText(match, info, now))}</div>
       </div>
     </div>
+    <div id="pollSlot"></div>
     <div class="section-head"><div class="section-title">Watch links</div></div>
     ${linksHtml}
   `;
+  if (poll) poll.attach(document.getElementById("pollSlot"));
 }
 
 function onError() {

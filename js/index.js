@@ -1,9 +1,7 @@
 import { db, ref, onValue } from "/js/firebase-config.js";
 import { mountLayout, loadPartial, fillTemplate } from "/js/layout.js";
-import { initAuth } from "/js/auth.js";
 
 const [, cardTpl] = await Promise.all([mountLayout(), loadPartial("battlecard")]);
-initAuth();
 
 document.getElementById("headerExtra").innerHTML = '<div class="live-pill" id="livePill"><span class="dot"></span><span id="liveCount">LIVE</span></div>';
 
@@ -71,7 +69,7 @@ async function shareMatch(id) {
   const m = matchesData[id];
   if (!m) return;
   const url = location.origin + "/match/" + encodeURIComponent(id);
-  const title = teamName(m.team1) + " vs " + teamName(m.team2);
+  const title = m.title ? String(m.title) : teamName(m.team1) + " vs " + teamName(m.team2);
   const text = title + " - Watch live on NPLcode";
   if (navigator.share) {
     try {
@@ -206,6 +204,7 @@ function cardHtml(id, m, info, now) {
     clock: ICON.clock,
     time: esc(timeLabel),
     tag: tagHtml(info),
+    title: m.title ? `<div style="text-align:center;font-size:clamp(1.15rem,4.6vw,1.6rem);font-weight:900;letter-spacing:-0.02em;line-height:1.15;margin:2px 0 14px;word-break:break-word">${esc(m.title)}</div>` : "",
     team1: teamHtml(m.team1, w === m.team1),
     team2: teamHtml(m.team2, w === m.team2),
     when: esc(whenText(m, info, now)),

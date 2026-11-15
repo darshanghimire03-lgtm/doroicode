@@ -1,13 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {
-  getAuth,
-  GoogleAuthProvider,
-  signInWithPopup,
-  signInWithRedirect,
-  onAuthStateChanged,
-  signOut
-} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import {
   getDatabase,
   ref,
   get,
@@ -15,13 +7,10 @@ import {
   update,
   remove,
   push,
-  query,
-  limitToLast,
   onValue,
-  onChildAdded,
-  onChildRemoved,
   onDisconnect,
-  serverTimestamp
+  serverTimestamp,
+  increment
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 
 const firebaseConfig = {
@@ -35,11 +24,7 @@ const firebaseConfig = {
 };
 
 export const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
 export const db = getDatabase(app);
-
-export const googleProvider = new GoogleAuthProvider();
-googleProvider.setCustomParameters({ prompt: "select_account" });
 
 export {
   ref,
@@ -48,15 +33,8 @@ export {
   update,
   remove,
   push,
-  query,
-  limitToLast,
   onValue,
-  onChildAdded,
-  onChildRemoved,
   onDisconnect,
   serverTimestamp,
-  signInWithPopup,
-  signInWithRedirect,
-  onAuthStateChanged,
-  signOut
+  increment
 };

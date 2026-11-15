@@ -4,7 +4,6 @@ export const config = { runtime: "edge" };
 
 const DB = "https://darshang-8f99d-default-rtdb.firebaseio.com";
 const LIME = "#A3E635";
-const LOGO = 300;
 
 async function getJson(path) {
   try {
@@ -62,7 +61,9 @@ function box(style, children) {
   return { type: "div", props: { style: Object.assign({ display: "flex" }, style), children } };
 }
 
-function teamBlock(name, logo) {
+function teamBlock(name, logo, size) {
+  const LOGO = size || 300;
+  const nameSize = LOGO >= 300 ? 44 : 34;
   const letter = name ? name.charAt(0).toUpperCase() : "?";
   const shown = name.length > 24 ? name.slice(0, 23) + "..." : name;
 
@@ -71,7 +72,7 @@ function teamBlock(name, logo) {
         {
           width: LOGO,
           height: LOGO,
-          borderRadius: 70,
+          borderRadius: Math.round(LOGO * 0.23),
           overflow: "hidden",
           background: "#0C0F0D",
           border: "4px solid rgba(163,230,53,0.55)"
@@ -84,28 +85,28 @@ function teamBlock(name, logo) {
           justifyContent: "center",
           width: LOGO,
           height: LOGO,
-          borderRadius: 70,
+          borderRadius: Math.round(LOGO * 0.23),
           background: "#151A17",
           border: "4px solid rgba(163,230,53,0.55)",
           color: LIME,
-          fontSize: 130,
+          fontSize: Math.round(LOGO * 0.43),
           fontWeight: 800
         },
         letter
       );
 
   return box(
-    { flexDirection: "column", alignItems: "center", width: 420 },
+    { flexDirection: "column", alignItems: "center", width: LOGO >= 300 ? 420 : 340 },
     [
       logoNode,
       box(
         {
           justifyContent: "center",
           textAlign: "center",
-          marginTop: 26,
-          maxWidth: 420,
+          marginTop: LOGO >= 300 ? 26 : 16,
+          maxWidth: LOGO >= 300 ? 420 : 340,
           color: "#F4F6F4",
-          fontSize: 44,
+          fontSize: nameSize,
           fontWeight: 800,
           lineHeight: 1.15
         },
@@ -121,6 +122,7 @@ export default async function handler(req) {
   const origin = url.origin;
   const host = new URL(origin).host.toUpperCase();
 
+  let title = "";
   let n1 = "";
   let n2 = "";
   let l1 = null;
@@ -136,6 +138,7 @@ export default async function handler(req) {
         getJson("/teams/" + encodeURIComponent(m.team1)),
         getJson("/teams/" + encodeURIComponent(m.team2))
       ]);
+      title = m.title ? String(m.title) : "";
       n1 = t1 && t1.name ? t1.name : "TBD";
       n2 = t2 && t2.name ? t2.name : "TBD";
       const logos = await Promise.all([
@@ -153,34 +156,58 @@ export default async function handler(req) {
     [box({}, "NPL"), box({ color: LIME }, "code")]
   );
 
-  const body = found
+  const compact = title.length > 0;
+  const logoSize = compact ? 180 : 300;
+  const shownTitle = title.length > 60 ? title.slice(0, 59) + "..." : title;
+  const titleNode = shownTitle
     ? box(
-        { alignItems: "center", justifyContent: "center", flex: 1, width: "100%" },
+        {
+          justifyContent: "center",
+          textAlign: "center",
+          maxWidth: 1060,
+          color: LIME,
+          fontSize: shownTitle.length > 36 ? 66 : 84,
+          fontWeight: 800,
+          lineHeight: 1.05,
+          letterSpacing: -2
+        },
+        shownTitle
+      )
+    : null;
+  const teamsRow = found
+    ? box(
+        { alignItems: "center", justifyContent: "center", width: "100%" },
         [
-          teamBlock(n1, l1),
+          teamBlock(n1, l1, logoSize),
           box(
             {
               alignItems: "center",
               justifyContent: "center",
-              width: 150,
-              height: 150,
+              width: compact ? 110 : 150,
+              height: compact ? 110 : 150,
               borderRadius: 75,
-              margin: "0 30px 80px",
+              margin: compact ? "0 30px 50px" : "0 30px 80px",
               background: LIME,
               color: "#0C0F0D",
-              fontSize: 58,
+              fontSize: compact ? 44 : 58,
               fontWeight: 800,
               boxShadow: "0 0 70px rgba(163,230,53,0.55)"
             },
             "VS"
           ),
-          teamBlock(n2, l2)
+          teamBlock(n2, l2, logoSize)
         ]
       )
     : box(
         { alignItems: "center", justifyContent: "center", flex: 1, color: "#F4F6F4", fontSize: 72, fontWeight: 800 },
         "Live matches & watch links"
       );
+
+  const body = found && titleNode
+    ? box({ flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, width: "100%" }, [titleNode, teamsRow])
+    : found
+      ? box({ alignItems: "center", justifyContent: "center", flex: 1, width: "100%" }, [teamsRow])
+      : teamsRow;
 
   const footer = box(
     {

@@ -1,20 +1,11 @@
 import { db, ref, set, onValue, remove, onDisconnect, serverTimestamp } from "/js/firebase-config.js";
 import { mountLayout } from "/js/layout.js";
-import { initAuth, isStaff } from "/js/auth.js";
-import { mountComments, refreshComments, startComments } from "/js/comments.js";
+import { createPoll } from "/js/poll.js";
 import { playCountdown } from "/js/animation.js";
 
 await mountLayout();
 
-document.addEventListener("auth:change", () => {
-  refreshComments();
-  render();
-  scheduleCountdown();
-});
-
-initAuth();
-
-const LINK_COUNT = 5;
+const LINK_COUNT = 8;
 const LIVE_MS = (4 * 60 + 30) * 60 * 1000;
 const BEAT_MS = 20000;
 const ACTIVE_MS = 90000;
@@ -81,6 +72,7 @@ function getLinkNo() {
 
 const matchId = getMatchId();
 let linkNo = getLinkNo();
+const poll = matchId ? createPoll(matchId) : null;
 
 let teamsData = {};
 let match = null;
@@ -318,15 +310,10 @@ function formatDateTime(ms) {
   return new Date(ms).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-function realState(m, now) {
+function getState(m, now) {
   if (now < m.startTime) return "notstarted";
   if (m.ended !== true && now < m.startTime + LIVE_MS) return "live";
   return "ended";
-}
-
-function getState(m, now) {
-  const s = realState(m, now);
-  return s === "notstarted" && isStaff() ? "live" : s;
 }
 
 function whenText(m, state, now) {
@@ -564,13 +551,15 @@ function render() {
 
   const now = nowMs();
   const state = getState(match, now);
-  document.title = teamName(match.team1) + " vs " + teamName(match.team2) + " - NPLcode";
+  const mainTitle = match.title ? String(match.title) : "";
+  document.title = (mainTitle || teamName(match.team1) + " vs " + teamName(match.team2)) + " - NPLcode";
 
   if (!document.getElementById("playerSlot")) {
-    root.innerHTML = '<div class="layout"><div class="col-main"><div id="playerSlot"></div><div id="barSlot"></div></div><div class="col-chat" id="chatSlot"></div></div>';
+    root.innerHTML = '<div class="layout"><div class="col-main"><div id="playerSlot"></div><div id="barSlot"></div></div><div class="col-chat" id="pollSlot"></div></div>';
     lastPlayerKey = null;
-    mountComments(document.getElementById("chatSlot"));
+    if (poll) poll.attach(document.getElementById("pollSlot"));
   }
+  if (poll) poll.setTeams(teamsData[match.team1], teamsData[match.team2], state === "ended");
 
   const available = [];
   let activeNo = 0;
@@ -655,7 +644,7 @@ function scheduleCountdown() {
   playCountdown({
     endAt: match.startTime,
     now: nowMs,
-    label: teamName(match.team1) + " vs " + teamName(match.team2),
+    label: (match.title ? String(match.title) : teamName(match.team1) + " vs " + teamName(match.team2)),
     onDone: () => {
       lastSignature = "";
       render();
@@ -669,6 +658,7 @@ async function deleteMatchData() {
   await remove(ref(db, "matches/" + matchId)).catch((err) => {
     console.warn("[NPLcode] Could not delete matches/" + matchId, err && err.message ? err.message : err);
   });
+  remove(ref(db, "polls/" + matchId)).catch(() => {});
 }
 
 function checkEnded() {
@@ -795,6 +785,7 @@ function listenMatch() {
         startTime: parts.startTime,
         team1: parts.team1,
         team2: parts.team2,
+        title: parts.title,
         winner: parts.winner,
         ended: parts.ended,
         links: parts.links
@@ -829,7 +820,6 @@ if (!matchId) {
 
   listenMatch();
   startPresence();
-  startComments(matchId);
 
   setInterval(() => {
     if (!match || typeof match.startTime !== "number") return;
