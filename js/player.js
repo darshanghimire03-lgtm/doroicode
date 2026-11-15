@@ -564,7 +564,6 @@ function render() {
 
   const now = nowMs();
   const state = getState(match, now);
-  const preview = isStaff() && realState(match, now) === "notstarted";
   document.title = teamName(match.team1) + " vs " + teamName(match.team2) + " - NPLcode";
 
   if (!document.getElementById("playerSlot")) {
@@ -625,7 +624,6 @@ function render() {
     <div class="controls">
       <div class="pills">
         ${badgeHtml(state)}
-        ${preview ? '<span class="pill">STAFF PREVIEW</span>' : ""}
         <span class="pill" title="Currently watching">${ICON.eye}<b>${count}</b> watching</span>
       </div>
       <div class="actions">
