@@ -1,8 +1,13 @@
 import { db, ref, onValue } from "/js/firebase-config.js";
 import { mountLayout } from "/js/layout.js";
-import { initAuth } from "/js/auth.js";
+import { initAuth, isStaff } from "/js/auth.js";
 
 await mountLayout();
+
+document.addEventListener("auth:change", () => {
+  render();
+});
+
 initAuth();
 
 document.getElementById("headerExtra").innerHTML = '<button class="share-btn" id="shareBtn" type="button" hidden aria-label="Share match"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg><span>Share</span></button>';
@@ -158,7 +163,7 @@ function getInfo(m, now) {
   const start = m.startTime;
   const dayDiff = dayNumber(start) - dayNumber(now);
   let state;
-  if (now < start) state = "notstarted";
+  if (now < start) state = isStaff() ? "live" : "notstarted";
   else if (m.ended !== true && now < start + LIVE_MS) state = "live";
   else state = "ended";
 
@@ -177,7 +182,10 @@ function winnerOf(m) {
 }
 
 function whenText(m, info, now) {
-  if (info.state === "live") return "Started " + duration(now - m.startTime) + " ago";
+  if (info.state === "live") {
+    if (now < m.startTime) return "Starts in " + duration(m.startTime - now);
+    return "Started " + duration(now - m.startTime) + " ago";
+  }
   if (info.state === "ended") {
     const w = winnerOf(m);
     return w ? "Winner: " + teamName(w) : "Match ended";
@@ -203,6 +211,7 @@ function tagHtml(info) {
     if (info.state === "ended") return '<span class="badge ended">MATCH ENDED</span>';
     return '<span class="badge notstarted">NOT STARTED</span>';
   }
+  if (info.state === "live") return '<span class="badge live">LIVE NOW</span>';
   if (info.dayDiff === 1) return '<span class="badge tomorrow">TOMORROW</span>';
   return `<span class="badge days">${info.dayDiff} DAYS LEFT</span>`;
 }

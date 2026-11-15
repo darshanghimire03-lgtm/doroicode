@@ -2,9 +2,11 @@ import { auth, db, googleProvider as provider, ref, get, set, update, serverTime
 
 const PROMPT_DELAY_MS = 1200;
 const PROMPT_KEY = "npl_auth_prompted";
+const STAFF_ROLES = ["mod", "admin"];
 const USER_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>';
 
 let user = null;
+let role = "";
 let ready = false;
 let busy = false;
 let closeTimer = null;
@@ -12,6 +14,14 @@ let els = null;
 
 export function getCurrentUser() {
   return user;
+}
+
+export function getRole() {
+  return role;
+}
+
+export function isStaff() {
+  return STAFF_ROLES.indexOf(role) !== -1;
 }
 
 export function isAuthReady() {
@@ -94,6 +104,15 @@ export async function ensureUserSaved(target) {
     profileUrl: u.photoURL || "",
     createdAt: serverTimestamp()
   });
+}
+
+async function loadRole(u) {
+  try {
+    const snap = await get(ref(db, "users/" + u.uid + "/role"));
+    return String(snap.val() || "").trim().toLowerCase();
+  } catch (err) {
+    return "";
+  }
 }
 
 function showError(err) {
@@ -200,6 +219,7 @@ export function initAuth() {
 
   onAuthStateChanged(auth, async (u) => {
     user = u;
+    role = "";
     paintUser();
     if (u) {
       try {
@@ -208,11 +228,14 @@ export function initAuth() {
         console.warn("[NPLcode] Could not save user to database", err);
       }
       if (user !== u) return;
+      const r = await loadRole(u);
+      if (user !== u) return;
+      role = r;
     }
     if (!ready) {
       ready = true;
       maybePrompt();
     }
-    document.dispatchEvent(new CustomEvent("auth:change", { detail: { user: u } }));
+    document.dispatchEvent(new CustomEvent("auth:change", { detail: { user: u, role: role } }));
   });
 }

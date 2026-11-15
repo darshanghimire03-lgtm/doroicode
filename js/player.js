@@ -1,6 +1,6 @@
 import { db, ref, set, onValue, remove, onDisconnect, serverTimestamp } from "/js/firebase-config.js";
 import { mountLayout } from "/js/layout.js";
-import { initAuth } from "/js/auth.js";
+import { initAuth, isStaff } from "/js/auth.js";
 import { mountComments, refreshComments, startComments } from "/js/comments.js";
 import { playCountdown } from "/js/animation.js";
 
@@ -8,6 +8,8 @@ await mountLayout();
 
 document.addEventListener("auth:change", () => {
   refreshComments();
+  render();
+  scheduleCountdown();
 });
 
 initAuth();
@@ -316,14 +318,22 @@ function formatDateTime(ms) {
   return new Date(ms).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-function getState(m, now) {
+function realState(m, now) {
   if (now < m.startTime) return "notstarted";
   if (m.ended !== true && now < m.startTime + LIVE_MS) return "live";
   return "ended";
 }
 
+function getState(m, now) {
+  const s = realState(m, now);
+  return s === "notstarted" && isStaff() ? "live" : s;
+}
+
 function whenText(m, state, now) {
-  if (state === "live") return "Started " + duration(now - m.startTime) + " ago";
+  if (state === "live") {
+    if (now < m.startTime) return "Starts in " + duration(m.startTime - now);
+    return "Started " + duration(now - m.startTime) + " ago";
+  }
   if (state === "notstarted") return "Starts in " + duration(m.startTime - now) + " · " + formatDateTime(m.startTime);
   return "Match ended";
 }
@@ -554,6 +564,7 @@ function render() {
 
   const now = nowMs();
   const state = getState(match, now);
+  const preview = isStaff() && realState(match, now) === "notstarted";
   document.title = teamName(match.team1) + " vs " + teamName(match.team2) + " - NPLcode";
 
   if (!document.getElementById("playerSlot")) {
@@ -614,6 +625,7 @@ function render() {
     <div class="controls">
       <div class="pills">
         ${badgeHtml(state)}
+        ${preview ? '<span class="pill">STAFF PREVIEW</span>' : ""}
         <span class="pill" title="Currently watching">${ICON.eye}<b>${count}</b> watching</span>
       </div>
       <div class="actions">
