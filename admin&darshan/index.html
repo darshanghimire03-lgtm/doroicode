@@ -366,22 +366,12 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getDatabase, ref, onValue, set, push, update, remove } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+import { ENV } from "/env.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyDejlLtvFPTFOJoXMFGjpuhImn6oYFCAxM",
-  authDomain: "darshang-8f99d.firebaseapp.com",
-  databaseURL: "https://darshang-8f99d-default-rtdb.firebaseio.com",
-  projectId: "darshang-8f99d",
-  storageBucket: "darshang-8f99d.firebasestorage.app",
-  messagingSenderId: "199221437404",
-  appId: "1:199221437404:web:e9c42331f2879378f6e519"
-};
-
-const app = initializeApp(firebaseConfig);
+const app = initializeApp(ENV.firebase);
 const db = getDatabase(app);
 
-const IMGBB_KEY = "PASTE_YOUR_IMGBB_API_KEY_HERE";
-const IMGBB_URL = "https://api.imgbb.com/1/upload";
+const UPLOAD_URL = "/api/upload";
 const TOTAL = 8;
 const LINK_COUNT = 8;
 const LIVE_MS = (4 * 60 + 30) * 60 * 1000;
@@ -508,50 +498,31 @@ function setNote(i, text, type) {
   el.className = "upload-note " + (type || "");
 }
 
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = String(reader.result || "");
-      resolve(result.slice(result.indexOf(",") + 1));
-    };
-    reader.onerror = () => reject(new Error("Could not read file"));
-    reader.readAsDataURL(file);
-  });
-}
-
 async function uploadLogo(i, file) {
   const fileInput = document.getElementById("file-" + i);
-  if (!IMGBB_KEY || IMGBB_KEY === "PASTE_YOUR_IMGBB_API_KEY_HERE") {
-    setNote(i, "Set IMGBB_KEY in the code first", "err");
-    fileInput.value = "";
-    return;
-  }
   if (!file.type.startsWith("image/")) {
     setNote(i, "Choose an image file", "err");
     fileInput.value = "";
     return;
   }
-  if (file.size > 16 * 1024 * 1024) {
-    setNote(i, "Image is larger than 16 MB", "err");
+  if (file.size > 4 * 1024 * 1024) {
+    setNote(i, "Image is larger than 4 MB", "err");
     fileInput.value = "";
     return;
   }
   setNote(i, "Uploading...", "");
   fileInput.disabled = true;
   try {
-    const b64 = await fileToBase64(file);
     const body = new FormData();
-    body.append("key", IMGBB_KEY);
-    body.append("image", b64);
-    const res = await fetch(IMGBB_URL, { method: "POST", body });
+    body.append("image", file);
+    const res = await fetch(UPLOAD_URL, { method: "POST", body });
     const json = await res.json();
-    if (!res.ok || !json || !json.success || !json.data || !json.data.url) {
-      throw new Error(json && json.error && json.error.message ? json.error.message : "Upload failed");
+    if (!res.ok || !json || !json.url) {
+      throw new Error(json && json.error ? json.error : "Upload failed");
     }
     const urlInput = document.getElementById("url-" + i);
-    urlInput.value = json.data.url;
-    renderLogo(i, json.data.url);
+    urlInput.value = json.url;
+    renderLogo(i, json.url);
     setNote(i, "Uploaded. Press Save to apply", "ok");
   } catch (e) {
     setNote(i, e.message || "Upload failed", "err");

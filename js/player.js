@@ -1,4 +1,9 @@
-import { db, ref, set, onValue, remove, onDisconnect, serverTimestamp } from "/js/firebase-config.js";
+import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import { getDatabase, ref, set, onValue, remove, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+import { ENV } from "/env.js";
+
+const app = getApps().length ? getApp() : initializeApp(ENV.firebase);
+const db = getDatabase(app);
 import { mountLayout } from "/js/layout.js";
 import { playCountdown } from "/js/animation.js";
 

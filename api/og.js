@@ -2,7 +2,7 @@ import { ImageResponse } from "@vercel/og";
 
 export const config = { runtime: "edge" };
 
-const DB = "https://darshang-8f99d-default-rtdb.firebaseio.com";
+const DB = process.env.FIREBASE_DATABASE_URL;
 const LIME = "#A3E635";
 
 async function getJson(path) {

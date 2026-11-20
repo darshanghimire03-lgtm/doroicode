@@ -1,6 +1,6 @@
 export const config = { runtime: "edge" };
 
-const DB = "https://darshang-8f99d-default-rtdb.firebaseio.com";
+const DB = process.env.FIREBASE_DATABASE_URL;
 
 function esc(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({
