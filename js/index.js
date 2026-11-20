@@ -42,6 +42,7 @@ let teamsData = {};
 let matchesData = {};
 let matchesLoaded = false;
 let failed = false;
+let errorText = "";
 let filter = "all";
 let lastSignature = "";
 let toastTimer = null;
@@ -253,7 +254,7 @@ function setCount(id, n) {
 
 function renderHome() {
   if (failed) {
-    homeMain.innerHTML = '<div class="empty">Could not load matches. Please check your connection and try again.</div>';
+    homeMain.innerHTML = '<div class="empty">Could not load matches.<br><small style="opacity:.7;word-break:break-word">' + esc(errorText || "Unknown error") + '</small></div>';
     return;
   }
   if (!matchesLoaded) return;
@@ -297,6 +298,7 @@ function renderHome() {
 
 function onError(err) {
   console.error("[NPLcode]", err);
+  errorText = (err && ((err.code ? err.code + ": " : "") + (err.message || err))) || "Unknown error";
   failed = true;
   renderHome();
 }
