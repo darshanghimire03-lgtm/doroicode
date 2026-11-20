@@ -165,45 +165,33 @@ function getInfo(m, now) {
   else if (m.ended !== true && now < start + LIVE_MS) state = "live";
   else state = "ended";
 
-  let visible = true;
   let group = "today";
   if (dayDiff > 0) group = "upcoming";
-  if (dayDiff < 0) {
-    if (state === "live") group = "today";
-    else visible = false;
-  }
-  return { state, dayDiff, visible, group };
-}
-
-function winnerOf(m) {
-  return m.winner && (m.winner === m.team1 || m.winner === m.team2) ? m.winner : null;
+  if (dayDiff < 0) group = state === "live" ? "today" : "finished";
+  return { state, dayDiff, visible: true, group };
 }
 
 function whenText(m, info, now) {
   if (info.state === "live") return "Started " + duration(now - m.startTime) + " ago";
-  if (info.state === "ended") {
-    const w = winnerOf(m);
-    return w ? "Winner: " + teamName(w) : "Match ended";
-  }
+  if (info.state === "ended") return "Match finished";
   if (info.group === "today") return "Starts in " + duration(m.startTime - now);
   return formatDate(m.startTime);
 }
 
-function teamHtml(id, isWinner) {
+function teamHtml(id) {
   const t = teamsData[id];
   const name = t && t.name ? esc(t.name) : "TBD";
   const letter = t && t.name ? esc(t.name.charAt(0).toUpperCase()) : "?";
   const logo = t && t.logourl
     ? `<img src="${esc(t.logourl)}" alt="" loading="lazy" onerror="this.parentNode.textContent='${letter}'">`
     : letter;
-  const tag = isWinner ? '<div class="win-tag">WINNER</div>' : "";
-  return `<div class="team ${isWinner ? "winner" : ""}"><div class="team-logo">${logo}</div><div class="team-name">${name}</div>${tag}</div>`;
+  return `<div class="team"><div class="team-logo">${logo}</div><div class="team-name">${name}</div></div>`;
 }
 
 function tagHtml(info) {
+  if (info.state === "ended") return '<span class="badge ended">MATCH FINISHED</span>';
   if (info.group === "today") {
     if (info.state === "live") return '<span class="badge live">LIVE NOW</span>';
-    if (info.state === "ended") return '<span class="badge ended">MATCH ENDED</span>';
     return '<span class="badge notstarted">NOT STARTED</span>';
   }
   if (info.dayDiff === 1) return '<span class="badge tomorrow">TOMORROW</span>';
@@ -213,10 +201,9 @@ function tagHtml(info) {
 function cardHtml(id, m, info, now) {
   const classes = ["match"];
   if (info.state === "live") classes.push("live");
-  if (info.group === "today" && info.state === "ended") classes.push("ended");
+  if (info.state === "ended") classes.push("ended");
   const goText = info.state === "live" ? ICON.play + "Watch now" : "Details" + ICON.arrow;
-  const w = info.state === "ended" ? winnerOf(m) : null;
-  const timeLabel = info.group === "upcoming" ? formatDate(m.startTime) + " · " + formatTime(m.startTime) : formatTime(m.startTime);
+  const timeLabel = info.group !== "today" ? formatDate(m.startTime) + " · " + formatTime(m.startTime) : formatTime(m.startTime);
   return fillTemplate(cardTpl, {
     classes: classes.join(" "),
     hrefId: encodeURIComponent(id),
@@ -225,8 +212,8 @@ function cardHtml(id, m, info, now) {
     time: esc(timeLabel),
     tag: tagHtml(info),
     title: m.title ? `<div style="text-align:center;font-size:clamp(1.15rem,4.6vw,1.6rem);font-weight:900;letter-spacing:-0.02em;line-height:1.15;margin:2px 0 14px;word-break:break-word">${esc(m.title)}</div>` : "",
-    team1: teamHtml(m.team1, w === m.team1),
-    team2: teamHtml(m.team2, w === m.team2),
+    team1: teamHtml(m.team1),
+    team2: teamHtml(m.team2),
     when: esc(whenText(m, info, now)),
     share: ICON.share,
     go: goText
@@ -262,8 +249,7 @@ function renderHome() {
   const now = Date.now();
   const items = Object.entries(matchesData)
     .filter(([, m]) => m && typeof m.startTime === "number")
-    .map(([id, m]) => ({ id, m, info: getInfo(m, now) }))
-    .filter((x) => x.info.visible);
+    .map(([id, m]) => ({ id, m, info: getInfo(m, now) }));
 
   const today = items
     .filter((x) => x.info.group === "today")
@@ -274,6 +260,12 @@ function renderHome() {
   const live = items
     .filter((x) => x.info.state === "live")
     .sort((a, b) => a.m.startTime - b.m.startTime);
+  const finished = items
+    .filter((x) => x.info.state === "ended")
+    .sort((a, b) => b.m.startTime - a.m.startTime);
+  const pastFinished = items
+    .filter((x) => x.info.group === "finished")
+    .sort((a, b) => b.m.startTime - a.m.startTime);
 
   livePill.classList.toggle("on", live.length > 0);
   liveCount.textContent = live.length + " LIVE";
@@ -282,6 +274,7 @@ function renderHome() {
   setCount("c-live", live.length);
   setCount("c-today", today.length);
   setCount("c-upcoming", upcoming.length);
+  setCount("c-finished", finished.length);
 
   if (filter === "live") {
     homeMain.innerHTML = sectionHtml("Live now", live, "No live matches right now", now);
@@ -289,10 +282,13 @@ function renderHome() {
     homeMain.innerHTML = sectionHtml("Today's matches", today, "No matches today", now);
   } else if (filter === "upcoming") {
     homeMain.innerHTML = sectionHtml("Upcoming matches", upcoming, "No upcoming matches", now);
+  } else if (filter === "finished") {
+    homeMain.innerHTML = sectionHtml("Finished matches", finished, "No finished matches", now);
   } else {
     homeMain.innerHTML =
       sectionHtml("Today's matches", today, "No matches today", now) +
-      sectionHtml("Upcoming matches", upcoming, "No upcoming matches", now);
+      sectionHtml("Upcoming matches", upcoming, "No upcoming matches", now) +
+      (pastFinished.length ? sectionHtml("Finished matches", pastFinished, "", now) : "");
   }
 }
 
@@ -337,7 +333,7 @@ setInterval(() => {
     .filter(([, m]) => m && typeof m.startTime === "number")
     .map(([id, m]) => {
       const i = getInfo(m, now);
-      return id + i.state + i.dayDiff + (i.visible ? "v" : "h") + whenText(m, i, now);
+      return id + i.state + i.dayDiff + i.group + whenText(m, i, now);
     })
     .join("|");
   if (sig !== lastSignature) {

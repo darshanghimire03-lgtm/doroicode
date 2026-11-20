@@ -4,6 +4,7 @@
   "rewrites": [
     { "source": "/match/player/:id", "destination": "/html/player" },
     { "source": "/match/:id", "destination": "/api/match?id=:id" },
+    { "source": "/admin", "destination": "/html/admin" },
     { "source": "/detail", "destination": "/html/detail" },
     { "source": "/player", "destination": "/html/player" }
   ]

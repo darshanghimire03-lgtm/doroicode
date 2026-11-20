@@ -15,8 +15,6 @@ const BEAT_MS = 20000;
 const ACTIVE_MS = 90000;
 const PRUNE_MS = 180000;
 const COUNTDOWN_MS = 3000;
-const DELETE_MIN_MS = 5000;
-const DELETE_MAX_MS = 15000;
 const MATCH_FIELDS = ["startTime", "team1", "team2", "ended", "links"];
 const HLS_SRC = "https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js";
 const SHAKA_SRC = "https://cdn.jsdelivr.net/npm/shaka-player@4.7.11/dist/shaka-player.compiled.js";
@@ -320,7 +318,7 @@ function whenText(m, state, now) {
     return "Started " + duration(now - m.startTime) + " ago";
   }
   if (state === "notstarted") return "Starts in " + duration(m.startTime - now) + " · " + formatDateTime(m.startTime);
-  return "Match ended";
+  return "Match finished";
 }
 
 function showToast(text) {
@@ -475,7 +473,7 @@ root.addEventListener("click", (e) => {
 
 function badgeHtml(state) {
   if (state === "live") return '<span class="badge live">LIVE NOW</span>';
-  if (state === "ended") return '<span class="badge ended">MATCH ENDED</span>';
+  if (state === "ended") return '<span class="badge ended">MATCH FINISHED</span>';
   return '<span class="badge notstarted">NOT STARTED</span>';
 }
 
@@ -503,9 +501,9 @@ function thumbNotStarted(m, now) {
 function thumbEnded(m) {
   return `
     <div class="thumb versus ended">
-      <div class="thumb-title">Match Ended</div>
+      <div class="thumb-title">Match Finished</div>
       ${versusHtml(m)}
-      <div class="thumb-chip">${ICON.flag}Match ended</div>
+      <div class="thumb-chip">${ICON.flag}Match finished</div>
       <div class="thumb-sub">Thanks for watching on NPLcode</div>
     </div>
   `;
@@ -640,21 +638,11 @@ function scheduleCountdown() {
   });
 }
 
-async function deleteMatchData() {
-  if (deleting || !matchId) return;
-  deleting = true;
-  await remove(ref(db, "matches/" + matchId)).catch((err) => {
-    console.warn("[NPLcode] Could not delete matches/" + matchId, err && err.message ? err.message : err);
-  });
-}
-
 function checkEnded() {
   if (endedHandled || !match || typeof match.startTime !== "number") return;
   if (getState(match, nowMs()) !== "ended") return;
   endedHandled = true;
   stopPresence();
-  const wait = DELETE_MIN_MS + Math.random() * (DELETE_MAX_MS - DELETE_MIN_MS);
-  setTimeout(deleteMatchData, wait);
 }
 
 function makeSessionId() {

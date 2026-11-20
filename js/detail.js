@@ -165,19 +165,15 @@ function getInfo(m, now) {
   else if (m.ended !== true && now < start + LIVE_MS) state = "live";
   else state = "ended";
 
-  let visible = true;
   let group = "today";
   if (dayDiff > 0) group = "upcoming";
-  if (dayDiff < 0) {
-    if (state === "live") group = "today";
-    else visible = false;
-  }
-  return { state, dayDiff, visible, group };
+  if (dayDiff < 0) group = state === "live" ? "today" : "finished";
+  return { state, dayDiff, visible: true, group };
 }
 
 function whenText(m, info, now) {
   if (info.state === "live") return "Started " + duration(now - m.startTime) + " ago";
-  if (info.state === "ended") return "Match ended";
+  if (info.state === "ended") return "Match finished";
   if (info.group === "today") return "Starts in " + duration(m.startTime - now);
   return formatDate(m.startTime);
 }
@@ -193,9 +189,9 @@ function teamHtml(id) {
 }
 
 function tagHtml(info) {
+  if (info.state === "ended") return '<span class="badge ended">MATCH FINISHED</span>';
   if (info.group === "today") {
     if (info.state === "live") return '<span class="badge live">LIVE NOW</span>';
-    if (info.state === "ended") return '<span class="badge ended">MATCH ENDED</span>';
     return '<span class="badge notstarted">NOT STARTED</span>';
   }
   if (info.dayDiff === 1) return '<span class="badge tomorrow">TOMORROW</span>';
@@ -246,7 +242,7 @@ function render() {
 
   const now = Date.now();
   const info = match && typeof match.startTime === "number" ? getInfo(match, now) : null;
-  if (!match || !info || !info.visible) {
+  if (!match || !info) {
     notFound("Match not found");
     return;
   }
@@ -263,7 +259,7 @@ function render() {
     : "";
 
   const linksHtml = info.state === "ended"
-    ? '<div class="empty">This match has ended</div>'
+    ? '<div class="empty">This match has finished</div>'
     : linksTableHtml(info);
 
   detail.innerHTML = `
@@ -309,7 +305,7 @@ if (!matchId) {
     if (!match || typeof match.startTime !== "number") return;
     const now = Date.now();
     const i = getInfo(match, now);
-    const sig = i.state + i.dayDiff + (i.visible ? "v" : "h") + whenText(match, i, now);
+    const sig = i.state + i.dayDiff + i.group + whenText(match, i, now);
     if (sig !== lastSignature) {
       lastSignature = sig;
       render();
