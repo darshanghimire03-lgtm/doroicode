@@ -2,6 +2,7 @@ import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebase
 import { getDatabase, ref, set, onValue, remove, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 import { ENV } from "/env.js";
 import { mountLayout } from "/js/layout.js";
+import { logoImg, normalizeImgUrl } from "/js/img.js";
 import { playCountdown } from "/js/animation.js";
 
 const app = getApps().length ? getApp() : initializeApp(ENV.firebase);
@@ -276,11 +277,9 @@ function teamLetter(id) {
 
 function teamLogoHtml(id) {
   const t = teamsData[id];
-  const letter = esc(teamLetter(id));
-  if (t && isHttpUrl(t.logourl)) {
-    return `<img src="${esc(t.logourl.trim())}" alt="" referrerpolicy="no-referrer" data-i="${letter}" onerror="this.replaceWith(document.createTextNode(this.dataset.i))">`;
-  }
-  return letter;
+  const letter = teamLetter(id);
+  if (t && normalizeImgUrl(t.logourl)) return logoImg(t.logourl, letter, false);
+  return esc(letter);
 }
 
 function teamSig(m) {

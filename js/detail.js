@@ -2,6 +2,7 @@ import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebase
 import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 import { ENV } from "/env.js";
 import { mountLayout } from "/js/layout.js";
+import { logoImg } from "/js/img.js";
 
 const app = getApps().length ? getApp() : initializeApp(ENV.firebase);
 const db = getDatabase(app);
@@ -181,10 +182,8 @@ function whenText(m, info, now) {
 function teamHtml(id) {
   const t = teamsData[id];
   const name = t && t.name ? esc(t.name) : "TBD";
-  const letter = t && t.name ? esc(t.name.charAt(0).toUpperCase()) : "?";
-  const logo = t && t.logourl
-    ? `<img src="${esc(t.logourl)}" alt="" onerror="this.parentNode.textContent='${letter}'">`
-    : letter;
+  const letter = t && t.name ? t.name.charAt(0).toUpperCase() : "?";
+  const logo = t && t.logourl ? logoImg(t.logourl, letter, false) : esc(letter);
   return `<div class="team"><div class="team-logo">${logo}</div><div class="team-name">${name}</div></div>`;
 }
 

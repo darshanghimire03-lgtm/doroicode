@@ -2,6 +2,7 @@ import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebase
 import { getDatabase, ref, onValue, set, update, remove, push } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 import { ENV } from "/env.js";
 import { mountLayout } from "/js/layout.js";
+import { logoImg } from "/js/img.js";
 
 const app = getApps().length ? getApp() : initializeApp(ENV.firebase);
 const db = getDatabase(app);
@@ -49,10 +50,8 @@ function teamName(id) {
 
 function logoHtml(id, big) {
   const t = teamsData[id];
-  const letter = t && t.name ? esc(t.name.charAt(0).toUpperCase()) : "?";
-  const inner = t && t.logourl
-    ? `<img src="${esc(t.logourl)}" alt="" loading="lazy" onerror="this.parentNode.textContent='${letter}'">`
-    : letter;
+  const letter = t && t.name ? t.name.charAt(0).toUpperCase() : "?";
+  const inner = t && t.logourl ? logoImg(t.logourl, letter, true) : esc(letter);
   return `<div class="logo-box${big ? " big" : ""}">${inner}</div>`;
 }
 
@@ -265,7 +264,7 @@ function openTeamForm(id) {
     <h2>${id ? "Edit team" : "Add team"}</h2>
     <form id="teamForm" data-id="${esc(id || "")}">
       <div class="logo-edit">
-        <div class="logo-box big" id="logoPrev">${url ? `<img src="${esc(url)}" alt="">` : esc(t && t.name ? t.name.charAt(0).toUpperCase() : "?")}</div>
+        <div class="logo-box big" id="logoPrev">${logoImg(url, t && t.name ? t.name.charAt(0).toUpperCase() : "?", false)}</div>
         <div class="field">
           <label for="fFile">Upload logo</label>
           <input id="fFile" type="file" accept="image/*">
@@ -315,7 +314,7 @@ modalCard.addEventListener("change", async (e) => {
       const data = await res.json();
       if (!res.ok || !data.url) throw new Error(data && data.error ? data.error : "Upload failed");
       document.getElementById("fLogo").value = data.url;
-      document.getElementById("logoPrev").innerHTML = `<img src="${esc(data.url)}" alt="">`;
+      document.getElementById("logoPrev").innerHTML = logoImg(data.url, "?", false);
       showToast("Logo uploaded");
     } catch (err) {
       setErr(err && err.message ? err.message : "Upload failed");
@@ -328,7 +327,7 @@ modalCard.addEventListener("input", (e) => {
   if (e.target.id === "fLogo") {
     const v = e.target.value.trim();
     const prev = document.getElementById("logoPrev");
-    if (prev && v) prev.innerHTML = `<img src="${esc(v)}" alt="">`;
+    if (prev && v) prev.innerHTML = logoImg(v, "?", false);
   }
 });
 
