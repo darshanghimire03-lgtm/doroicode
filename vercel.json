@@ -2,7 +2,9 @@
   "cleanUrls": true,
   "outputDirectory": ".",
   "rewrites": [
-    { "source": "/match/player/:id", "destination": "/player" },
-    { "source": "/match/:id", "destination": "/api/match?id=:id" }
+    { "source": "/match/player/:id", "destination": "/html/player" },
+    { "source": "/match/:id", "destination": "/api/match?id=:id" },
+    { "source": "/detail", "destination": "/html/detail" },
+    { "source": "/player", "destination": "/html/player" }
   ]
 }

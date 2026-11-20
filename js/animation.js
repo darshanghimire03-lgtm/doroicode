@@ -1,5 +1,5 @@
 const CSS_HREF = "/css/animation.css";
-const HTML_HREF = "/animation.html";
+const HTML_HREF = "/html/animation.html";
 const START_HOLD_MS = 1100;
 const TICK_MS = 60;
 

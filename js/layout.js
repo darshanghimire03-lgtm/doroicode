@@ -2,8 +2,8 @@ const cache = new Map();
 
 export function loadPartial(name) {
   if (!cache.has(name)) {
-    cache.set(name, fetch("/layout/" + name + ".html").then((r) => {
-      if (!r.ok) throw new Error("Could not load layout/" + name);
+    cache.set(name, fetch("/html/" + name + ".html").then((r) => {
+      if (!r.ok) throw new Error("Could not load html/" + name);
       return r.text();
     }));
   }

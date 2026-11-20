@@ -33,12 +33,12 @@ export default async function handler(req) {
 
   let pageRes;
   try {
-    pageRes = await fetch(origin + "/detail");
+    pageRes = await fetch(origin + "/html/detail");
   } catch (e) {
     pageRes = null;
   }
   if (!pageRes || !pageRes.ok) {
-    return Response.redirect(origin + "/detail?id=" + encodeURIComponent(id), 302);
+    return Response.redirect(origin + "/html/detail?id=" + encodeURIComponent(id), 302);
   }
 
   let html = await pageRes.text();
