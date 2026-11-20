@@ -1,19 +1,33 @@
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
-import { ENV } from "/env.js";
 import { mountLayout, loadPartial, fillTemplate } from "/js/layout.js";
 
-const app = getApps().length ? getApp() : initializeApp(ENV.firebase);
-const db = getDatabase(app);
+async function loadFirebaseConfig() {
+  const mod = await import("/env.js");
+  const fb = mod && mod.ENV && mod.ENV.firebase;
+  if (!fb || !fb.apiKey || !fb.databaseURL) {
+    throw new Error("Firebase environment variables are missing on Vercel");
+  }
+  return fb;
+}
 
-const [, cardTpl] = await Promise.all([mountLayout(), loadPartial("battlecard")]);
+let cardTpl = "";
+try {
+  const res = await Promise.all([mountLayout(), loadPartial("battlecard")]);
+  cardTpl = res[1];
+} catch (err) {
+  console.warn("[NPLcode] layout failed", err);
+}
 
-document.getElementById("headerExtra").innerHTML = '<div class="live-pill" id="livePill"><span class="dot"></span><span id="liveCount">LIVE</span></div>';
+const headerExtra = document.getElementById("headerExtra");
+if (headerExtra) {
+  headerExtra.innerHTML = '<div class="live-pill" id="livePill"><span class="dot"></span><span id="liveCount">LIVE</span></div>';
+}
 
 const LIVE_MS = (4 * 60 + 30) * 60 * 1000;
 const homeMain = document.getElementById("homeMain");
-const livePill = document.getElementById("livePill");
-const liveCount = document.getElementById("liveCount");
+const livePill = document.getElementById("livePill") || document.createElement("div");
+const liveCount = document.getElementById("liveCount") || document.createElement("span");
 const toastEl = document.getElementById("toast");
 const filtersEl = document.getElementById("filters");
 
@@ -281,22 +295,38 @@ function renderHome() {
   }
 }
 
-function onError() {
+function onError(err) {
+  console.error("[NPLcode]", err);
   failed = true;
   renderHome();
 }
 
-onValue(ref(db, "teams"), (snap) => {
-  teamsData = snap.val() || {};
-  renderHome();
-}, onError);
+let db = null;
+try {
+  const firebaseConfig = await loadFirebaseConfig();
+  const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+  db = getDatabase(app);
+} catch (err) {
+  onError(err);
+}
 
-onValue(ref(db, "matches"), (snap) => {
-  matchesData = snap.val() || {};
-  matchesLoaded = true;
-  failed = false;
-  renderHome();
-}, onError);
+if (db) {
+  onValue(ref(db, "teams"), (snap) => {
+    teamsData = snap.val() || {};
+    renderHome();
+  }, onError);
+
+  onValue(ref(db, "matches"), (snap) => {
+    matchesData = snap.val() || {};
+    matchesLoaded = true;
+    failed = false;
+    renderHome();
+  }, onError);
+
+  setTimeout(() => {
+    if (!matchesLoaded) onError(new Error("Timed out loading matches"));
+  }, 12000);
+}
 
 setInterval(() => {
   if (!matchesLoaded) return;
