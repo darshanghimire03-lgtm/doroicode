@@ -1,7 +1,7 @@
 {
   "cleanUrls": true,
+  "outputDirectory": ".",
   "rewrites": [
-    { "source": "/env.js", "destination": "/api/env" },
     { "source": "/match/player/:id", "destination": "/player" },
     { "source": "/match/:id", "destination": "/api/match?id=:id" }
   ]

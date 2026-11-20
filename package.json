@@ -2,6 +2,9 @@
   "name": "nplcode",
   "private": true,
   "type": "module",
+  "scripts": {
+    "build": "node build-env.js"
+  },
   "dependencies": {
     "@vercel/og": "^0.6.2"
   }
