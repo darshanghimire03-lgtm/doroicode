@@ -1,6 +1,5 @@
 import { db, ref, set, onValue, remove, onDisconnect, serverTimestamp } from "/js/firebase-config.js";
 import { mountLayout } from "/js/layout.js";
-import { createPoll } from "/js/poll.js";
 import { playCountdown } from "/js/animation.js";
 
 await mountLayout();
@@ -13,7 +12,7 @@ const PRUNE_MS = 180000;
 const COUNTDOWN_MS = 3000;
 const DELETE_MIN_MS = 5000;
 const DELETE_MAX_MS = 15000;
-const MATCH_FIELDS = ["startTime", "team1", "team2", "winner", "ended", "links"];
+const MATCH_FIELDS = ["startTime", "team1", "team2", "ended", "links"];
 const HLS_SRC = "https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js";
 const SHAKA_SRC = "https://cdn.jsdelivr.net/npm/shaka-player@4.7.11/dist/shaka-player.compiled.js";
 const WA_URL = "https://whatsapp.com/channel/0029Vb8vBWZ6WaKmmQZnWX3o";
@@ -34,7 +33,6 @@ const ICON = {
   share: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg>',
   clock: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
   flag: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 4h12l-2 4 2 4H5"/></svg>',
-  trophy: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>',
   off: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>',
   whatsapp: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>',
   telegram: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg>',
@@ -72,7 +70,6 @@ function getLinkNo() {
 
 const matchId = getMatchId();
 let linkNo = getLinkNo();
-const poll = matchId ? createPoll(matchId) : null;
 
 let teamsData = {};
 let match = null;
@@ -289,10 +286,6 @@ function teamSig(m) {
   return [a.name, a.logourl, b.name, b.logourl].join("~");
 }
 
-function winnerOf(m) {
-  return m.winner && (m.winner === m.team1 || m.winner === m.team2) ? m.winner : null;
-}
-
 function duration(ms) {
   const mins = Math.max(1, Math.round(ms / 60000));
   if (mins < 60) return mins + " min";
@@ -485,13 +478,9 @@ function thumbBrand() {
   return '<div class="thumb-brand"><div class="thumb-logo">N</div><div class="thumb-word">NPL<span>code</span></div></div>';
 }
 
-function versusHtml(m, ended) {
-  const w = ended ? winnerOf(m) : null;
-  const side = (id) => {
-    const cls = w ? (w === id ? "win" : "lose") : "";
-    const tag = w === id ? `<span class="vs-win">${ICON.trophy}WINNER</span>` : "";
-    return `<div class="vs-team ${cls}"><div class="vs-logo">${teamLogoHtml(id)}</div><div class="vs-name">${esc(teamName(id))}</div>${tag}</div>`;
-  };
+function versusHtml(m) {
+  const side = (id) =>
+    `<div class="vs-team"><div class="vs-logo">${teamLogoHtml(id)}</div><div class="vs-name">${esc(teamName(id))}</div></div>`;
   return `<div class="vs-row">${side(m.team1)}<div class="vs-mid"><span class="vs-line"></span><span class="vs-text">VS</span><span class="vs-line"></span></div>${side(m.team2)}</div>`;
 }
 
@@ -499,7 +488,7 @@ function thumbNotStarted(m, now) {
   return `
     <div class="thumb versus">
       <div class="thumb-title">Match not started yet</div>
-      ${versusHtml(m, false)}
+      ${versusHtml(m)}
       <div class="thumb-chip">${ICON.clock}Starts in ${esc(duration(m.startTime - now))}</div>
       <div class="thumb-sub">${esc(formatDateTime(m.startTime))}</div>
     </div>
@@ -507,15 +496,11 @@ function thumbNotStarted(m, now) {
 }
 
 function thumbEnded(m) {
-  const w = winnerOf(m);
-  const chip = w
-    ? `<div class="thumb-chip">${ICON.trophy}Winner: ${esc(teamName(w))}</div>`
-    : `<div class="thumb-chip">${ICON.flag}Full time</div>`;
   return `
     <div class="thumb versus ended">
       <div class="thumb-title">Match Ended</div>
-      ${versusHtml(m, true)}
-      ${chip}
+      ${versusHtml(m)}
+      <div class="thumb-chip">${ICON.flag}Match ended</div>
       <div class="thumb-sub">Thanks for watching on NPLcode</div>
     </div>
   `;
@@ -555,11 +540,9 @@ function render() {
   document.title = (mainTitle || teamName(match.team1) + " vs " + teamName(match.team2)) + " - NPLcode";
 
   if (!document.getElementById("playerSlot")) {
-    root.innerHTML = '<div class="layout"><div class="col-main"><div id="playerSlot"></div><div id="barSlot"></div></div><div class="col-chat" id="pollSlot"></div></div>';
+    root.innerHTML = '<div class="layout"><div class="col-main"><div id="playerSlot"></div><div id="barSlot"></div></div></div>';
     lastPlayerKey = null;
-    if (poll) poll.attach(document.getElementById("pollSlot"));
   }
-  if (poll) poll.setTeams(teamsData[match.team1], teamsData[match.team2], state === "ended");
 
   const available = [];
   let activeNo = 0;
@@ -588,7 +571,7 @@ function render() {
     playerKey = "nolinks";
     playerHtml = thumbNoLinks();
   } else if (state === "ended") {
-    playerKey = "ended|" + (match.winner || "") + "|" + sig;
+    playerKey = "ended|" + sig;
     playerHtml = thumbEnded(match);
   } else {
     playerKey = "soon|" + duration(match.startTime - now) + "|" + sig;
@@ -658,7 +641,6 @@ async function deleteMatchData() {
   await remove(ref(db, "matches/" + matchId)).catch((err) => {
     console.warn("[NPLcode] Could not delete matches/" + matchId, err && err.message ? err.message : err);
   });
-  remove(ref(db, "polls/" + matchId)).catch(() => {});
 }
 
 function checkEnded() {
@@ -786,7 +768,6 @@ function listenMatch() {
         team1: parts.team1,
         team2: parts.team2,
         title: parts.title,
-        winner: parts.winner,
         ended: parts.ended,
         links: parts.links
       };

@@ -1,6 +1,5 @@
 import { db, ref, onValue } from "/js/firebase-config.js";
 import { mountLayout } from "/js/layout.js";
-import { createPoll } from "/js/poll.js";
 
 await mountLayout();
 
@@ -30,7 +29,6 @@ function getMatchId() {
 }
 
 const matchId = getMatchId();
-const poll = matchId ? createPoll(matchId) : null;
 
 let teamsData = {};
 let match = null;
@@ -172,29 +170,21 @@ function getInfo(m, now) {
   return { state, dayDiff, visible, group };
 }
 
-function winnerOf(m) {
-  return m.winner && (m.winner === m.team1 || m.winner === m.team2) ? m.winner : null;
-}
-
 function whenText(m, info, now) {
   if (info.state === "live") return "Started " + duration(now - m.startTime) + " ago";
-  if (info.state === "ended") {
-    const w = winnerOf(m);
-    return w ? "Winner: " + teamName(w) : "Match ended";
-  }
+  if (info.state === "ended") return "Match ended";
   if (info.group === "today") return "Starts in " + duration(m.startTime - now);
   return formatDate(m.startTime);
 }
 
-function teamHtml(id, isWinner) {
+function teamHtml(id) {
   const t = teamsData[id];
   const name = t && t.name ? esc(t.name) : "TBD";
   const letter = t && t.name ? esc(t.name.charAt(0).toUpperCase()) : "?";
   const logo = t && t.logourl
     ? `<img src="${esc(t.logourl)}" alt="" onerror="this.parentNode.textContent='${letter}'">`
     : letter;
-  const tag = isWinner ? '<div class="win-tag">WINNER</div>' : "";
-  return `<div class="team ${isWinner ? "winner" : ""}"><div class="team-logo">${logo}</div><div class="team-name">${name}</div>${tag}</div>`;
+  return `<div class="team"><div class="team-logo">${logo}</div><div class="team-name">${name}</div></div>`;
 }
 
 function tagHtml(info) {
@@ -257,7 +247,6 @@ function render() {
   }
 
   shareBtn.hidden = false;
-  const winnerId = info.state === "ended" ? winnerOf(match) : null;
 
   const t1 = teamsData[match.team1];
   const t2 = teamsData[match.team2];
@@ -268,8 +257,6 @@ function render() {
     ? `<h1 style="text-align:center;font-size:clamp(1.5rem,6vw,2.4rem);font-weight:900;letter-spacing:-0.03em;line-height:1.1;margin:0 0 18px;word-break:break-word">${esc(mainTitle)}</h1>`
     : "";
 
-  if (poll) poll.setTeams(t1, t2, info.state === "ended");
-
   const linksHtml = info.state === "ended"
     ? '<div class="empty">This match has ended</div>'
     : linksTableHtml(info);
@@ -278,20 +265,18 @@ function render() {
     <div class="match-card ${info.state === "live" ? "live" : ""}">
       ${titleHtml}
       <div class="teams">
-        ${teamHtml(match.team1, winnerId === match.team1)}
+        ${teamHtml(match.team1)}
         <div class="vs">VS</div>
-        ${teamHtml(match.team2, winnerId === match.team2)}
+        ${teamHtml(match.team2)}
       </div>
       <div class="info">
         ${tagHtml(info)}
         <div class="when">${esc(formatTime(match.startTime))} &middot; ${esc(whenText(match, info, now))}</div>
       </div>
     </div>
-    <div id="pollSlot"></div>
     <div class="section-head"><div class="section-title">Watch links</div></div>
     ${linksHtml}
   `;
-  if (poll) poll.attach(document.getElementById("pollSlot"));
 }
 
 function onError() {

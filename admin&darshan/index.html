@@ -289,9 +289,11 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   background: var(--danger);
   color: #101211;
 }
-.winner-line { font-size: 0.85rem; color: var(--muted); }
-.winner-line span { color: var(--primary); font-weight: 800; }
-.pick-box { display: flex; flex-direction: column; gap: 10px; }
+.upload-row { display: flex; gap: 8px; align-items: center; }
+.upload-row input[type="file"] { padding: 8px; font-size: 0.8rem; }
+.upload-note { font-size: 0.72rem; color: var(--muted); min-height: 1em; }
+.upload-note.err { color: var(--danger); }
+.upload-note.ok { color: var(--primary); }
 .empty {
   text-align: center;
   color: var(--muted);
@@ -378,6 +380,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
+const IMGBB_KEY = "PASTE_YOUR_IMGBB_API_KEY_HERE";
+const IMGBB_URL = "https://api.imgbb.com/1/upload";
 const TOTAL = 8;
 const LINK_COUNT = 8;
 const LIVE_MS = (4 * 60 + 30) * 60 * 1000;
@@ -398,7 +402,7 @@ const matchList = document.getElementById("matchList");
 let teamsData = {};
 let matchesData = {};
 let editingId = null;
-let endingId = null;
+const sweeping = new Set();
 
 function setStatus(text, type) {
   statusEl.textContent = text;
@@ -473,6 +477,13 @@ function buildCards() {
         <input id="name-${i}" type="text" placeholder="Team name" autocomplete="off">
       </div>
       <div>
+        <label for="file-${i}">Upload logo (imgbb)</label>
+        <div class="upload-row">
+          <input id="file-${i}" type="file" accept="image/*">
+        </div>
+        <div class="upload-note" id="note-${i}"></div>
+      </div>
+      <div>
         <label for="url-${i}">Logo URL</label>
         <input id="url-${i}" type="url" placeholder="https://..." autocomplete="off">
       </div>
@@ -484,7 +495,69 @@ function buildCards() {
     grid.appendChild(card);
     const urlInput = card.querySelector("#url-" + i);
     urlInput.addEventListener("input", () => renderLogo(i, urlInput.value.trim()));
+    card.querySelector("#file-" + i).addEventListener("change", (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) uploadLogo(i, file);
+    });
   }
+}
+
+function setNote(i, text, type) {
+  const el = document.getElementById("note-" + i);
+  el.textContent = text;
+  el.className = "upload-note " + (type || "");
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      resolve(result.slice(result.indexOf(",") + 1));
+    };
+    reader.onerror = () => reject(new Error("Could not read file"));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function uploadLogo(i, file) {
+  const fileInput = document.getElementById("file-" + i);
+  if (!IMGBB_KEY || IMGBB_KEY === "PASTE_YOUR_IMGBB_API_KEY_HERE") {
+    setNote(i, "Set IMGBB_KEY in the code first", "err");
+    fileInput.value = "";
+    return;
+  }
+  if (!file.type.startsWith("image/")) {
+    setNote(i, "Choose an image file", "err");
+    fileInput.value = "";
+    return;
+  }
+  if (file.size > 16 * 1024 * 1024) {
+    setNote(i, "Image is larger than 16 MB", "err");
+    fileInput.value = "";
+    return;
+  }
+  setNote(i, "Uploading...", "");
+  fileInput.disabled = true;
+  try {
+    const b64 = await fileToBase64(file);
+    const body = new FormData();
+    body.append("key", IMGBB_KEY);
+    body.append("image", b64);
+    const res = await fetch(IMGBB_URL, { method: "POST", body });
+    const json = await res.json();
+    if (!res.ok || !json || !json.success || !json.data || !json.data.url) {
+      throw new Error(json && json.error && json.error.message ? json.error.message : "Upload failed");
+    }
+    const urlInput = document.getElementById("url-" + i);
+    urlInput.value = json.data.url;
+    renderLogo(i, json.data.url);
+    setNote(i, "Uploaded. Press Save to apply", "ok");
+  } catch (e) {
+    setNote(i, e.message || "Upload failed", "err");
+  }
+  fileInput.value = "";
+  fileInput.disabled = false;
 }
 
 function renderLogo(i, url) {
@@ -531,6 +604,8 @@ async function clearSlot(i) {
     await remove(ref(db, "teams/team" + i));
     document.getElementById("name-" + i).value = "";
     document.getElementById("url-" + i).value = "";
+    document.getElementById("file-" + i).value = "";
+    setNote(i, "", "");
     renderLogo(i, "");
     setStatus("Team " + i + " cleared", "ok");
   } catch (e) {
@@ -672,13 +747,44 @@ function teamLabel(id) {
   return t && t.name ? t.name : "Unknown";
 }
 
-function winnerOf(m) {
-  return m.winner && (m.winner === m.team1 || m.winner === m.team2) ? m.winner : null;
+function isOver(m, now) {
+  return m.ended === true || now >= m.startTime + LIVE_MS;
+}
+
+async function sweepMatches() {
+  const now = Date.now();
+  for (const [id, m] of Object.entries(matchesData)) {
+    if (!m || typeof m.startTime !== "number") continue;
+    if (now < m.startTime || !isOver(m, now)) continue;
+    const needsEnd = m.ended !== true;
+    const hasLinks = m.links && Object.keys(m.links).length > 0;
+    if (!needsEnd && !hasLinks) continue;
+    if (sweeping.has(id)) continue;
+    sweeping.add(id);
+    try {
+      await update(ref(db, "matches/" + id), { ended: true, links: null, winner: null });
+      setStatus("Match auto ended, streams deleted", "ok");
+    } catch (e) {
+      setStatus("Auto end failed: " + e.message, "err");
+    }
+    sweeping.delete(id);
+  }
+}
+
+async function endMatch(id) {
+  if (!matchesData[id]) return;
+  if (!confirm("End this match and delete its streams?")) return;
+  try {
+    await update(ref(db, "matches/" + id), { ended: true, links: null, winner: null });
+    setStatus("Match ended, streams deleted", "ok");
+  } catch (e) {
+    setStatus("End failed: " + e.message, "err");
+  }
 }
 
 function matchState(m, now) {
   if (now < m.startTime) return "upcoming";
-  if (m.ended === true || now >= m.startTime + LIVE_MS) return "ended";
+  if (isOver(m, now)) return "ended";
   return "live";
 }
 
@@ -701,37 +807,14 @@ function renderMatches() {
     } else {
       badge = `<span class="badge soon" data-countdown="${m.startTime}">Starts in ${countdown(m.startTime - now)}</span>`;
     }
-    const winnerId = state === "ended" ? winnerOf(m) : null;
-    const winnerLine = winnerId
-      ? `<div class="winner-line">Winner: <span>${escapeHtml(teamLabel(winnerId))}</span></div>`
-      : "";
-    let endBtn = "";
-    if (state === "live") {
-      endBtn = `<button class="btn-end" data-end="${id}">End match</button>`;
-    } else if (state === "ended") {
-      endBtn = `<button class="btn-ghost" data-end="${id}">${winnerId ? "Change winner" : "Set winner"}</button>`;
-    }
-    const actions = endingId === id
-      ? `
-        <div class="pick-box">
-          <div class="links-title">Who won?</div>
-          <div class="match-actions">
-            <button class="btn-primary" data-pick="team1" data-match="${id}">${escapeHtml(teamLabel(m.team1))}</button>
-            <button class="btn-primary" data-pick="team2" data-match="${id}">${escapeHtml(teamLabel(m.team2))}</button>
-          </div>
-          <div class="match-actions">
-            <button class="btn-ghost" data-pick="none" data-match="${id}">No result</button>
-            <button class="btn-clear" data-cancel-end="1">Cancel</button>
-          </div>
-        </div>
-      `
-      : `
-        <div class="match-actions">
-          ${endBtn}
-          <button class="btn-ghost" data-edit="${id}">Edit</button>
-          <button class="btn-clear" data-delete="${id}">Delete</button>
-        </div>
-      `;
+    const endBtn = state === "live" ? `<button class="btn-end" data-end="${id}">End match</button>` : "";
+    const actions = `
+      <div class="match-actions">
+        ${endBtn}
+        <button class="btn-ghost" data-edit="${id}">Edit</button>
+        <button class="btn-clear" data-delete="${id}">Delete</button>
+      </div>
+    `;
     return `
       <div class="match ${state === "live" ? "live" : ""} ${state === "ended" ? "ended" : ""}" data-id="${id}">
         ${m.title ? `<div class="match-title">${escapeHtml(m.title)}</div>` : ""}
@@ -744,8 +827,7 @@ function renderMatches() {
           <span class="time">${formatTime(m.startTime)}</span>
           ${badge}
         </div>
-        ${winnerLine}
-        ${linkChips(id, m.links)}
+        ${state === "ended" ? "" : linkChips(id, m.links)}
         ${actions}
       </div>
     `;
@@ -795,8 +877,6 @@ async function saveMatch() {
   const data = { team1: t1, team2: t2, title: title, startTime: ms, links: links, ended: null, winner: null };
   if (editingId && matchesData[editingId] && matchesData[editingId].ended === true && ms <= Date.now()) {
     data.ended = true;
-    const prev = matchesData[editingId].winner;
-    if (prev && (prev === t1 || prev === t2)) data.winner = prev;
   }
   saveMatchBtn.disabled = true;
   try {
@@ -824,31 +904,7 @@ matchList.addEventListener("click", async (e) => {
   const editBtn = e.target.closest("[data-edit]");
   const delBtn = e.target.closest("[data-delete]");
   const endBtn = e.target.closest("[data-end]");
-  const pickBtn = e.target.closest("[data-pick]");
-  const cancelEndBtn = e.target.closest("[data-cancel-end]");
-  if (endBtn) {
-    endingId = endBtn.dataset.end;
-    renderMatches();
-  }
-  if (cancelEndBtn) {
-    endingId = null;
-    renderMatches();
-  }
-  if (pickBtn) {
-    const id = pickBtn.dataset.match;
-    const choice = pickBtn.dataset.pick;
-    const m = matchesData[id];
-    if (!m) return;
-    const winner = choice === "none" ? null : m[choice];
-    try {
-      await update(ref(db, "matches/" + id), { ended: true, winner: winner });
-      setStatus(winner ? "Winner saved" : "Match ended", "ok");
-    } catch (err) {
-      setStatus("Save failed: " + err.message, "err");
-    }
-    endingId = null;
-    renderMatches();
-  }
+  if (endBtn) endMatch(endBtn.dataset.end);
   if (editBtn) {
     loadMatchIntoForm(editBtn.dataset.edit);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -899,6 +955,7 @@ onValue(
     if (editingId && !matchesData[editingId]) resetForm();
     fillMatchSelect();
     renderMatches();
+    sweepMatches();
   },
   (err) => setStatus("Read failed: " + err.message, "err")
 );
@@ -917,8 +974,13 @@ setInterval(() => {
   document.querySelectorAll("[data-endat]").forEach((el) => {
     if (now >= Number(el.dataset.endat)) needsRender = true;
   });
-  if (needsRender) renderMatches();
+  if (needsRender) {
+    renderMatches();
+    sweepMatches();
+  }
 }, 1000);
+
+setInterval(sweepMatches, 30000);
 </script>
 </body>
 </html>
