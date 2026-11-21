@@ -1,7 +1,7 @@
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-import { getDatabase, ref, set, onValue, remove, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+import { getDatabase, ref, set, onValue, remove, onDisconnect, serverTimestamp, query, orderByChild, startAt, limitToFirst } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 import { ENV } from "/env.js";
-import { mountLayout } from "/js/layout.js";
+import { mountLayout, loadPartial, fillTemplate } from "/js/layout.js";
 import { logoImg, normalizeImgUrl, bgImg } from "/js/img.js";
 import { playCountdown } from "/js/animation.js";
 
@@ -10,12 +10,21 @@ const db = getDatabase(app);
 
 await mountLayout();
 
+let cardTpl = "";
+try {
+  cardTpl = await loadPartial("battlecard");
+} catch (err) {
+  cardTpl = "";
+}
+
 const LINK_COUNT = 8;
 const LIVE_MS = (4 * 60 + 30) * 60 * 1000;
 const BEAT_MS = 20000;
 const ACTIVE_MS = 90000;
 const PRUNE_MS = 180000;
 const COUNTDOWN_MS = 3000;
+const NEXT_MAX = 12;
+const NEXT_FETCH = 40;
 const MATCH_FIELDS = ["startTime", "team1", "team2", "title", "ended", "links"];
 const HLS_SRC = "https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js";
 const SHAKA_SRC = "https://cdn.jsdelivr.net/npm/shaka-player@4.7.11/dist/shaka-player.compiled.js";
@@ -76,6 +85,8 @@ const matchId = getMatchId();
 let linkNo = getLinkNo();
 
 let teamsData = {};
+let matchesData = {};
+let lastNextHtml = "";
 let match = null;
 let loaded = false;
 let failed = false;
@@ -320,6 +331,19 @@ function whenText(m, state, now) {
   return "Match finished";
 }
 
+function dayNumber(ms) {
+  const d = new Date(ms);
+  return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
+}
+
+function formatTime(ms) {
+  return new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatDate(ms) {
+  return new Date(ms).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+}
+
 function showToast(text) {
   toastEl.textContent = text;
   toastEl.classList.add("show");
@@ -531,6 +555,57 @@ function thumbNoLinks() {
   `;
 }
 
+function nextTeamHtml(id) {
+  return `<div class="team"><div class="team-logo">${teamLogoHtml(id)}</div><div class="team-name">${esc(teamName(id))}</div></div>`;
+}
+
+function nextItems(now) {
+  return Object.entries(matchesData)
+    .filter(([id, m]) => id !== matchId && m && typeof m.startTime === "number")
+    .map(([id, m]) => ({ id, m, state: getState(m, now) }))
+    .filter((x) => x.state !== "ended")
+    .sort((a, b) => (a.state === "live" ? 0 : 1) - (b.state === "live" ? 0 : 1) || a.m.startTime - b.m.startTime)
+    .slice(0, NEXT_MAX);
+}
+
+function nextCardHtml(x, now) {
+  const m = x.m;
+  const live = x.state === "live";
+  const sameDay = dayNumber(m.startTime) === dayNumber(now);
+  const timeLabel = live || sameDay ? formatTime(m.startTime) : formatDate(m.startTime) + " · " + formatTime(m.startTime);
+  let when;
+  if (live) when = "Started " + duration(now - m.startTime) + " ago";
+  else if (sameDay) when = "Starts in " + duration(m.startTime - now);
+  else when = formatDate(m.startTime);
+  const tag = live ? '<span class="badge live">LIVE NOW</span>' : '<span class="badge upcoming">UPCOMING</span>';
+  return fillTemplate(cardTpl, {
+    classes: live ? "match live" : "match",
+    hrefId: encodeURIComponent(x.id),
+    clock: ICON.clock,
+    time: esc(timeLabel),
+    tag,
+    title: m.title ? `<div class="match-title">${esc(m.title)}</div>` : "",
+    bg1: bgHtml(m.team1),
+    bg2: bgHtml(m.team2),
+    team1: nextTeamHtml(m.team1),
+    team2: nextTeamHtml(m.team2),
+    when: esc(when)
+  });
+}
+
+function renderNext() {
+  const slot = document.getElementById("nextSlot");
+  if (!slot) return;
+  const now = nowMs();
+  const items = cardTpl ? nextItems(now) : [];
+  const html = items.length
+    ? `<div class="next-wrap"><div class="next-head"><div class="next-title">Next matches</div><div class="next-count">${items.length}</div></div><div class="next-list">${items.map((x) => nextCardHtml(x, now)).join("")}</div></div>`
+    : "";
+  if (html === lastNextHtml) return;
+  lastNextHtml = html;
+  slot.innerHTML = html;
+}
+
 function notFound(text) {
   playToken++;
   destroyEngine();
@@ -555,8 +630,9 @@ function render() {
   document.title = (mainTitle || teamName(match.team1) + " vs " + teamName(match.team2)) + " - NPLcode";
 
   if (!document.getElementById("playerSlot")) {
-    root.innerHTML = '<div class="layout"><div class="col-main"><div id="playerSlot"></div><div id="barSlot"></div></div></div>';
+    root.innerHTML = '<div class="layout"><div class="col-main"><div id="playerSlot"></div><div id="barSlot"></div><div id="nextSlot"></div></div></div>';
     lastPlayerKey = null;
+    lastNextHtml = "";
   }
 
   const available = [];
@@ -620,6 +696,7 @@ function render() {
       </div>
     </div>
   `;
+  renderNext();
 }
 
 function onError() {
@@ -810,6 +887,19 @@ if (!matchId) {
     render();
   }, onError);
 
+  onValue(
+    query(ref(db, "matches"), orderByChild("startTime"), startAt(Date.now() - LIVE_MS), limitToFirst(NEXT_FETCH)),
+    (snap) => {
+      const next = {};
+      snap.forEach((child) => {
+        next[child.key] = child.val();
+      });
+      matchesData = next;
+      renderNext();
+    },
+    () => {}
+  );
+
   listenMatch();
   startPresence();
 
@@ -825,4 +915,6 @@ if (!matchId) {
     checkEnded();
     scheduleCountdown();
   }, 1000);
+
+  setInterval(renderNext, 1000);
 }
