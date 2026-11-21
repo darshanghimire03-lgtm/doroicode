@@ -2,7 +2,7 @@ import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebase
 import { getDatabase, ref, set, onValue, remove, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 import { ENV } from "/env.js";
 import { mountLayout } from "/js/layout.js";
-import { logoImg, normalizeImgUrl } from "/js/img.js";
+import { logoImg, normalizeImgUrl, bgImg } from "/js/img.js";
 import { playCountdown } from "/js/animation.js";
 
 const app = getApps().length ? getApp() : initializeApp(ENV.firebase);
@@ -16,7 +16,7 @@ const BEAT_MS = 20000;
 const ACTIVE_MS = 90000;
 const PRUNE_MS = 180000;
 const COUNTDOWN_MS = 3000;
-const MATCH_FIELDS = ["startTime", "team1", "team2", "ended", "links"];
+const MATCH_FIELDS = ["startTime", "team1", "team2", "title", "ended", "links"];
 const HLS_SRC = "https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js";
 const SHAKA_SRC = "https://cdn.jsdelivr.net/npm/shaka-player@4.7.11/dist/shaka-player.compiled.js";
 const WA_URL = "https://whatsapp.com/channel/0029Vb8vBWZ6WaKmmQZnWX3o";
@@ -285,7 +285,7 @@ function teamLogoHtml(id) {
 function teamSig(m) {
   const a = teamsData[m.team1] || {};
   const b = teamsData[m.team2] || {};
-  return [a.name, a.logourl, b.name, b.logourl].join("~");
+  return [a.name, a.logourl, b.name, b.logourl, m.title].join("~");
 }
 
 function duration(ms) {
@@ -480,16 +480,27 @@ function thumbBrand() {
   return '<div class="thumb-brand"><div class="thumb-logo">N</div><div class="thumb-word">NPL<span>code</span></div></div>';
 }
 
+function bgHtml(id) {
+  const t = teamsData[id];
+  return t && normalizeImgUrl(t.logourl) ? bgImg(t.logourl) : "";
+}
+
+function bgSplitHtml(m) {
+  return `<div class="bg-split" aria-hidden="true"><div class="half left">${bgHtml(m.team1)}</div><div class="half right">${bgHtml(m.team2)}</div></div>`;
+}
+
 function versusHtml(m) {
   const side = (id) =>
     `<div class="vs-team"><div class="vs-logo">${teamLogoHtml(id)}</div><div class="vs-name">${esc(teamName(id))}</div></div>`;
-  return `<div class="vs-row">${side(m.team1)}<div class="vs-mid"><span class="vs-line"></span><span class="vs-text">VS</span><span class="vs-line"></span></div>${side(m.team2)}</div>`;
+  return `<div class="vs-row">${side(m.team1)}<div class="vs-mid"><span class="vs-text">VS</span></div>${side(m.team2)}</div>`;
 }
 
 function thumbNotStarted(m, now) {
+  const heading = m.title ? String(m.title) : "Match not started yet";
   return `
     <div class="thumb versus">
-      <div class="thumb-title">Match not started yet</div>
+      ${bgSplitHtml(m)}
+      <div class="thumb-title">${esc(heading)}</div>
       ${versusHtml(m)}
       <div class="thumb-chip">${ICON.clock}Starts in ${esc(duration(m.startTime - now))}</div>
       <div class="thumb-sub">${esc(formatDateTime(m.startTime))}</div>
@@ -498,9 +509,11 @@ function thumbNotStarted(m, now) {
 }
 
 function thumbEnded(m) {
+  const heading = m.title ? String(m.title) : "Match Finished";
   return `
     <div class="thumb versus ended">
-      <div class="thumb-title">Match Finished</div>
+      ${bgSplitHtml(m)}
+      <div class="thumb-title">${esc(heading)}</div>
       ${versusHtml(m)}
       <div class="thumb-chip">${ICON.flag}Match finished</div>
       <div class="thumb-sub">Thanks for watching on NPLcode</div>
@@ -774,11 +787,17 @@ function listenMatch() {
   }
 
   MATCH_FIELDS.forEach((field) => {
+    const handleErr = field === "title"
+      ? () => {
+          got.add(field);
+          apply();
+        }
+      : onError;
     onValue(ref(db, "matches/" + matchId + "/" + field), (snap) => {
       parts[field] = snap.val();
       got.add(field);
       apply();
-    }, onError);
+    }, handleErr);
   });
 }
 
