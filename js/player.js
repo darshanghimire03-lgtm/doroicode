@@ -127,32 +127,74 @@ function esc(s) {
   }[c]));
 }
 
+function parseHeader(target, v) {
+  const i = v.indexOf(":");
+  if (i < 1) return;
+  const k = v.slice(0, i).trim();
+  const val = v.slice(i + 1).trim();
+  if (k && val) target[k] = val;
+}
+
 function parseLink(raw) {
   const s = String(raw || "").trim();
-  const i = s.indexOf("|");
-  const url = (i === -1 ? s : s.slice(0, i)).trim();
-  const extra = i === -1 ? "" : s.slice(i + 1).trim();
+  const parts = s.split("|").map((x) => x.trim());
+  const url = parts[0] || "";
+  const extras = parts.slice(1).filter(Boolean);
   const path = url.split(/[?#]/)[0].toLowerCase();
   let type = "iframe";
   if (path.endsWith(".m3u8")) type = "hls";
   else if (path.endsWith(".mpd")) type = "dash";
-  let drm = null;
-  if (extra && type !== "iframe") {
-    const m = extra.match(/^(widevine|playready)\s*=\s*(.+)$/i);
-    if (m) {
-      drm = { kind: m[1].toLowerCase(), license: m[2].trim() };
-    } else {
-      const keys = {};
-      extra.split(",").forEach((pair) => {
-        const parts = pair.split(":");
-        const kid = (parts[0] || "").trim().toLowerCase().replace(/-/g, "");
-        const key = (parts[1] || "").trim().toLowerCase().replace(/-/g, "");
-        if (kid && key) keys[kid] = key;
+  extras.forEach((seg) => {
+    const m = seg.match(/^type\s*=\s*(hls|dash)$/i);
+    if (m) type = m[1].toLowerCase();
+  });
+
+  const servers = {};
+  const clearKeys = {};
+  const headers = {};
+  const licenseHeaders = {};
+  let fairplayCert = "";
+
+  if (type !== "iframe") {
+    extras.forEach((seg) => {
+      if (/^type\s*=/i.test(seg)) return;
+      let m = seg.match(/^(widevine|playready|fairplay|clearkey)\s*=\s*(.+)$/i);
+      if (m) {
+        const kind = m[1].toLowerCase();
+        const val = m[2].trim();
+        if (kind === "widevine") servers["com.widevine.alpha"] = val;
+        else if (kind === "playready") servers["com.microsoft.playready"] = val;
+        else if (kind === "fairplay") servers["com.apple.fps"] = val;
+        else servers["org.w3.clearkey"] = val;
+        return;
+      }
+      m = seg.match(/^fairplaycert\s*=\s*(.+)$/i);
+      if (m) {
+        fairplayCert = m[1].trim();
+        return;
+      }
+      m = seg.match(/^(?:lheader|lh)\s*=\s*(.+)$/i);
+      if (m) {
+        parseHeader(licenseHeaders, m[1]);
+        return;
+      }
+      m = seg.match(/^(?:header|h)\s*=\s*(.+)$/i);
+      if (m) {
+        parseHeader(headers, m[1]);
+        return;
+      }
+      seg.split(",").forEach((pair) => {
+        const kv = pair.split(":");
+        const kid = (kv[0] || "").trim().toLowerCase().replace(/-/g, "");
+        const key = (kv[1] || "").trim().toLowerCase().replace(/-/g, "");
+        if (/^[0-9a-f]{32}$/.test(kid) && /^[0-9a-f]{32}$/.test(key)) clearKeys[kid] = key;
       });
-      if (Object.keys(keys).length) drm = { kind: "clearkey", keys };
-    }
+    });
   }
-  return { raw: s, url, type, drm };
+
+  const hasDrm = Object.keys(servers).length > 0 || Object.keys(clearKeys).length > 0;
+  const drm = hasDrm ? { servers, clearKeys, fairplayCert } : null;
+  return { raw: s, url, type, drm, headers, licenseHeaders };
 }
 
 function loadScript(src) {
@@ -179,6 +221,14 @@ function destroyEngine() {
   } catch (err) {}
 }
 
+function streamErrorText(err, fallback) {
+  const code = err && typeof err.code === "number" ? err.code : 0;
+  if (code === 6001 || code === 6002 || code === 6003 || code === 6010) return "This browser or device does not support this stream's DRM.";
+  if (code >= 6000 && code < 7000) return "DRM license or key failed.";
+  if (code === 1001 || code === 1002 || code === 1003) return "Stream server refused or could not be reached.";
+  return fallback;
+}
+
 async function startVideo(p, token) {
   const video = document.getElementById("vid");
   const msg = document.getElementById("vidMsg");
@@ -197,13 +247,26 @@ async function startVideo(p, token) {
     });
   };
 
+  const hasHeaders = Object.keys(p.headers).length > 0;
+  const hasLicenseHeaders = Object.keys(p.licenseHeaders).length > 0;
+
   try {
     if (p.type === "hls" && !p.drm) {
       await loadScript(HLS_SRC);
       if (token !== playToken) return;
       const Hls = window.Hls;
       if (Hls && Hls.isSupported()) {
-        const hls = new Hls({ lowLatencyMode: true });
+        const conf = { lowLatencyMode: true };
+        if (hasHeaders) {
+          conf.xhrSetup = (xhr) => {
+            Object.keys(p.headers).forEach((k) => {
+              try {
+                xhr.setRequestHeader(k, p.headers[k]);
+              } catch (err) {}
+            });
+          };
+        }
+        const hls = new Hls(conf);
         engine = hls;
         let retries = 0;
         hls.on(Hls.Events.ERROR, (ev, data) => {
@@ -250,29 +313,41 @@ async function startVideo(p, token) {
 
     const cfg = {};
     if (p.drm) {
-      if (p.drm.kind === "clearkey") {
-        cfg.drm = { clearKeys: p.drm.keys };
-      } else if (p.drm.kind === "widevine") {
-        cfg.drm = { servers: { "com.widevine.alpha": p.drm.license } };
-      } else if (p.drm.kind === "playready") {
-        cfg.drm = { servers: { "com.microsoft.playready": p.drm.license } };
+      cfg.drm = {};
+      if (Object.keys(p.drm.servers).length) cfg.drm.servers = p.drm.servers;
+      if (Object.keys(p.drm.clearKeys).length) cfg.drm.clearKeys = p.drm.clearKeys;
+      if (p.drm.fairplayCert) {
+        cfg.drm.advanced = { "com.apple.fps": { serverCertificateUri: p.drm.fairplayCert } };
       }
     }
     player.configure(cfg);
 
+    if (hasHeaders || hasLicenseHeaders) {
+      const net = player.getNetworkingEngine();
+      const LICENSE = shaka.net.NetworkingEngine.RequestType.LICENSE;
+      net.registerRequestFilter((type, request) => {
+        Object.keys(p.headers).forEach((k) => {
+          request.headers[k] = p.headers[k];
+        });
+        if (type === LICENSE) {
+          Object.keys(p.licenseHeaders).forEach((k) => {
+            request.headers[k] = p.licenseHeaders[k];
+          });
+        }
+      });
+    }
+
     player.addEventListener("error", (ev) => {
-      const code = ev && ev.detail ? ev.detail.code : 0;
-      if (code >= 6000 && code < 7000) fail("DRM license or key failed.");
-      else fail("Stream failed to load. Try another stream.");
+      const d = ev && ev.detail ? ev.detail : null;
+      if (d && typeof d.severity === "number" && d.severity !== shaka.util.Error.Severity.CRITICAL) return;
+      fail(streamErrorText(d, "Stream failed to load. Try another stream."));
     });
 
     await player.load(p.url);
     if (token !== playToken) return;
     play();
   } catch (err) {
-    const code = err && typeof err.code === "number" ? err.code : 0;
-    if (code >= 6000 && code < 7000) fail("DRM license or key failed.");
-    else fail("Stream failed to load. Try another stream.");
+    fail(streamErrorText(err, "Stream failed to load. Try another stream."));
   }
 }
 
