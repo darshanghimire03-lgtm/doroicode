@@ -184,8 +184,12 @@ function teamHtml(id) {
   const name = t && t.name ? esc(t.name) : "TBD";
   const letter = t && t.name ? t.name.charAt(0).toUpperCase() : "?";
   const logo = t && t.logourl ? logoImg(t.logourl, letter, true) : esc(letter);
-  const bg = t && t.logourl ? bgImg(t.logourl) : "";
-  return `<div class="team">${bg}<div class="team-logo">${logo}</div><div class="team-name">${name}</div></div>`;
+  return `<div class="team"><div class="team-logo">${logo}</div><div class="team-name">${name}</div></div>`;
+}
+
+function bgHtml(id) {
+  const t = teamsData[id];
+  return t && t.logourl ? bgImg(t.logourl) : "";
 }
 
 function tagHtml(info) {
@@ -211,7 +215,9 @@ function cardHtml(id, m, info, now) {
     clock: ICON.clock,
     time: esc(timeLabel),
     tag: tagHtml(info),
-    title: m.title ? `<div style="text-align:center;font-size:clamp(1.15rem,4.6vw,1.6rem);font-weight:900;letter-spacing:-0.02em;line-height:1.15;margin:2px 0 14px;word-break:break-word">${esc(m.title)}</div>` : "",
+    title: m.title ? `<div style="text-align:center;font-size:clamp(1.15rem,4.6vw,1.6rem);font-weight:900;letter-spacing:-0.02em;line-height:1.15;margin:2px 0 14px;word-break:break-word;text-shadow:0 3px 18px rgba(0,0,0,0.85)">${esc(m.title)}</div>` : "",
+    bg1: bgHtml(m.team1),
+    bg2: bgHtml(m.team2),
     team1: teamHtml(m.team1),
     team2: teamHtml(m.team2),
     when: esc(whenText(m, info, now)),
