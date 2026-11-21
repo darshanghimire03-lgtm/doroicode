@@ -215,7 +215,7 @@ function cardHtml(id, m, info, now) {
     clock: ICON.clock,
     time: esc(timeLabel),
     tag: tagHtml(info),
-    title: m.title ? `<div style="text-align:center;font-size:clamp(1.15rem,4.6vw,1.6rem);font-weight:900;letter-spacing:-0.02em;line-height:1.15;margin:2px 0 14px;word-break:break-word;text-shadow:0 3px 18px rgba(0,0,0,0.85)">${esc(m.title)}</div>` : "",
+    title: m.title ? `<div class="match-title">${esc(m.title)}</div>` : "",
     bg1: bgHtml(m.team1),
     bg2: bgHtml(m.team2),
     team1: teamHtml(m.team1),
