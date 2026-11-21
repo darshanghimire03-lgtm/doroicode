@@ -47,9 +47,9 @@ async function logoData(src, origin) {
   }
 }
 
-async function loadFont() {
+async function loadFont(url) {
   try {
-    const r = await fetch("https://cdn.jsdelivr.net/fontsource/fonts/inter@5.0.8/latin-800-normal.woff");
+    const r = await fetch(url);
     if (!r.ok) return null;
     return await r.arrayBuffer();
   } catch (e) {
@@ -61,58 +61,123 @@ function box(style, children) {
   return { type: "div", props: { style: Object.assign({ display: "flex" }, style), children } };
 }
 
-function teamBlock(name, logo, size) {
-  const LOGO = size || 300;
-  const nameSize = LOGO >= 300 ? 44 : 34;
+function abs(style, children) {
+  return box(Object.assign({ position: "absolute" }, style), children);
+}
+
+function bgHalf(logo, side) {
+  const left = side === "left";
+  const rgb = left ? "163,230,53" : "34,211,238";
+  const kids = [];
+
+  if (logo) {
+    kids.push({
+      type: "img",
+      props: {
+        src: logo,
+        width: 900,
+        height: 900,
+        style: {
+          position: "absolute",
+          left: -60,
+          top: -135,
+          width: 900,
+          height: 900,
+          objectFit: "cover",
+          filter: "blur(40px)",
+          opacity: 0.95
+        }
+      }
+    });
+  }
+
+  kids.push(
+    abs({
+      left: 0,
+      top: 0,
+      width: 780,
+      height: 630,
+      background: "linear-gradient(" + (left ? "90deg" : "270deg") + ", rgba(" + rgb + ",0.30) 0%, rgba(" + rgb + ",0) 80%)"
+    })
+  );
+
+  const style = {
+    position: "absolute",
+    top: 0,
+    width: 780,
+    height: 630,
+    overflow: "hidden",
+    background: "linear-gradient(" + (left ? "160deg" : "200deg") + ", rgba(" + rgb + ",0.25), #0C0F0D)",
+    maskImage: "linear-gradient(" + (left ? "90deg" : "270deg") + ", #000 42%, rgba(0,0,0,0) 100%)"
+  };
+  style[left ? "left" : "right"] = 0;
+  return box(style, kids);
+}
+
+function teamCol(name, logo, side, compact) {
+  const left = side === "left";
+  const accent = left ? LIME : "#22D3EE";
+  const rgb = left ? "163,230,53" : "34,211,238";
+  const size = compact ? 190 : 250;
   const letter = name ? name.charAt(0).toUpperCase() : "?";
-  const shown = name.length > 24 ? name.slice(0, 23) + "..." : name;
+  const shown = name.length > 22 ? name.slice(0, 21) + "..." : name;
 
   const logoNode = logo
     ? box(
         {
-          width: LOGO,
-          height: LOGO,
-          borderRadius: Math.round(LOGO * 0.23),
+          width: size,
+          height: size,
+          borderRadius: Math.round(size * 0.24),
           overflow: "hidden",
           background: "#0C0F0D",
-          border: "4px solid rgba(163,230,53,0.55)"
+          border: "5px solid " + accent,
+          boxShadow: "0 0 60px rgba(" + rgb + ",0.55)"
         },
-        { type: "img", props: { src: logo, width: LOGO, height: LOGO, style: { width: LOGO, height: LOGO, objectFit: "cover" } } }
+        { type: "img", props: { src: logo, width: size, height: size, style: { width: size, height: size, objectFit: "cover" } } }
       )
     : box(
         {
           alignItems: "center",
           justifyContent: "center",
-          width: LOGO,
-          height: LOGO,
-          borderRadius: Math.round(LOGO * 0.23),
+          width: size,
+          height: size,
+          borderRadius: Math.round(size * 0.24),
           background: "#151A17",
-          border: "4px solid rgba(163,230,53,0.55)",
-          color: LIME,
-          fontSize: Math.round(LOGO * 0.43),
+          border: "5px solid " + accent,
+          boxShadow: "0 0 60px rgba(" + rgb + ",0.55)",
+          color: accent,
+          fontSize: Math.round(size * 0.46),
           fontWeight: 800
         },
         letter
       );
 
-  return box(
-    { flexDirection: "column", alignItems: "center", width: LOGO >= 300 ? 420 : 340 },
-    [
-      logoNode,
-      box(
-        {
-          justifyContent: "center",
-          textAlign: "center",
-          marginTop: LOGO >= 300 ? 26 : 16,
-          maxWidth: LOGO >= 300 ? 420 : 340,
-          color: "#F4F6F4",
-          fontSize: nameSize,
-          fontWeight: 800,
-          lineHeight: 1.15
-        },
-        shown
-      )
-    ]
+  const nameNode = box(
+    {
+      justifyContent: "center",
+      textAlign: "center",
+      marginTop: 24,
+      maxWidth: 520,
+      color: "#F4F6F4",
+      fontSize: compact ? 38 : 46,
+      fontWeight: 800,
+      lineHeight: 1.12,
+      textShadow: "0 4px 24px rgba(0,0,0,0.85)"
+    },
+    shown
+  );
+
+  return abs(
+    {
+      left: left ? 0 : 600,
+      top: 0,
+      width: 600,
+      height: 630,
+      flexDirection: "column",
+      alignItems: "center",
+      paddingTop: compact ? 182 : 140
+    },
+    [logoNode, nameNode]
   );
 }
 
@@ -129,7 +194,8 @@ export default async function handler(req) {
   let l2 = null;
   let found = false;
 
-  const fontPromise = loadFont();
+  const interPromise = loadFont("https://cdn.jsdelivr.net/fontsource/fonts/inter@5.0.8/latin-800-normal.woff");
+  const thunderPromise = loadFont("https://cdn.jsdelivr.net/fontsource/fonts/racing-sans-one@latest/latin-400-normal.woff");
 
   if (id) {
     const m = await getJson("/matches/" + encodeURIComponent(id));
@@ -152,62 +218,9 @@ export default async function handler(req) {
   }
 
   const brand = box(
-    { alignItems: "center", fontSize: 42, fontWeight: 800, color: "#F4F6F4" },
+    { alignItems: "center", fontSize: 40, fontWeight: 800, color: "#F4F6F4", textShadow: "0 4px 20px rgba(0,0,0,0.8)" },
     [box({}, "NPL"), box({ color: LIME }, "code")]
   );
-
-  const compact = title.length > 0;
-  const logoSize = compact ? 180 : 300;
-  const shownTitle = title.length > 60 ? title.slice(0, 59) + "..." : title;
-  const titleNode = shownTitle
-    ? box(
-        {
-          justifyContent: "center",
-          textAlign: "center",
-          maxWidth: 1060,
-          color: LIME,
-          fontSize: shownTitle.length > 36 ? 66 : 84,
-          fontWeight: 800,
-          lineHeight: 1.05,
-          letterSpacing: -2
-        },
-        shownTitle
-      )
-    : null;
-  const teamsRow = found
-    ? box(
-        { alignItems: "center", justifyContent: "center", width: "100%" },
-        [
-          teamBlock(n1, l1, logoSize),
-          box(
-            {
-              alignItems: "center",
-              justifyContent: "center",
-              width: compact ? 110 : 150,
-              height: compact ? 110 : 150,
-              borderRadius: 75,
-              margin: compact ? "0 30px 50px" : "0 30px 80px",
-              background: LIME,
-              color: "#0C0F0D",
-              fontSize: compact ? 44 : 58,
-              fontWeight: 800,
-              boxShadow: "0 0 70px rgba(163,230,53,0.55)"
-            },
-            "VS"
-          ),
-          teamBlock(n2, l2, logoSize)
-        ]
-      )
-    : box(
-        { alignItems: "center", justifyContent: "center", flex: 1, color: "#F4F6F4", fontSize: 72, fontWeight: 800 },
-        "Live matches & watch links"
-      );
-
-  const body = found && titleNode
-    ? box({ flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, width: "100%" }, [titleNode, teamsRow])
-    : found
-      ? box({ alignItems: "center", justifyContent: "center", flex: 1, width: "100%" }, [teamsRow])
-      : teamsRow;
 
   const footer = box(
     {
@@ -215,28 +228,105 @@ export default async function handler(req) {
       justifyContent: "center",
       color: "#0C0F0D",
       background: LIME,
-      fontSize: 28,
+      fontSize: 26,
       fontWeight: 800,
-      padding: "12px 34px",
-      borderRadius: 999
+      padding: "10px 32px",
+      borderRadius: 999,
+      boxShadow: "0 0 40px rgba(163,230,53,0.45)"
     },
     found ? "WATCH LIVE ON " + host : host
   );
 
-  const tree = box(
-    {
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "space-between",
-      width: "100%",
-      height: "100%",
-      padding: "40px 60px",
-      background: "linear-gradient(160deg, #1C231F 0%, #0C0F0D 65%)"
-    },
-    [brand, body, footer]
-  );
+  let tree;
 
-  const font = await fontPromise;
+  if (found) {
+    const compact = title.length > 0;
+    const shownTitle = title.length > 36 ? title.slice(0, 35) + "..." : title;
+
+    const children = [
+      bgHalf(l1, "left"),
+      bgHalf(l2, "right"),
+      abs({ left: 0, top: 0, width: 1200, height: 630, background: "linear-gradient(180deg, rgba(12,15,13,0.36) 0%, rgba(12,15,13,0.84) 100%)" }),
+      abs({ left: 420, top: 0, width: 360, height: 630, background: "linear-gradient(90deg, rgba(12,15,13,0) 0%, rgba(12,15,13,0.5) 50%, rgba(12,15,13,0) 100%)" }),
+      teamCol(n1, l1, "left", compact),
+      teamCol(n2, l2, "right", compact),
+      abs(
+        {
+          left: 0,
+          top: compact ? 195 : 190,
+          width: 1200,
+          height: 160,
+          alignItems: "center",
+          justifyContent: "center"
+        },
+        box(
+          {
+            fontFamily: "Racing Sans One",
+            fontSize: 160,
+            fontWeight: 400,
+            letterSpacing: 6,
+            color: "#F6FFB8",
+            transform: "skewX(-12deg)",
+            textShadow: "0 0 36px rgba(163,230,53,0.95)"
+          },
+          "VS"
+        )
+      ),
+      abs({ left: 0, top: 26, width: 1200, justifyContent: "center" }, brand)
+    ];
+
+    if (compact) {
+      children.push(
+        abs(
+          { left: 90, top: 92, width: 1020, alignItems: "center", justifyContent: "center" },
+          [
+            box({ flex: 1, height: 4, borderRadius: 4, background: "linear-gradient(90deg, rgba(163,230,53,0), #A3E635)" }),
+            box(
+              {
+                justifyContent: "center",
+                textAlign: "center",
+                margin: "0 26px",
+                color: "#FFFFFF",
+                fontSize: shownTitle.length > 24 ? 46 : 58,
+                fontWeight: 800,
+                letterSpacing: 2,
+                textTransform: "uppercase",
+                textShadow: "0 4px 28px rgba(0,0,0,0.9)"
+              },
+              shownTitle
+            ),
+            box({ flex: 1, height: 4, borderRadius: 4, background: "linear-gradient(270deg, rgba(34,211,238,0), #22D3EE)" })
+          ]
+        )
+      );
+    }
+
+    children.push(abs({ left: 0, bottom: 28, width: 1200, justifyContent: "center" }, footer));
+
+    tree = box({ position: "relative", width: 1200, height: 630, background: "#0C0F0D" }, children);
+  } else {
+    tree = box(
+      {
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "space-between",
+        width: "100%",
+        height: "100%",
+        padding: "40px 60px",
+        background: "linear-gradient(160deg, #1C231F 0%, #0C0F0D 65%)"
+      },
+      [
+        brand,
+        box(
+          { alignItems: "center", justifyContent: "center", flex: 1, color: "#F4F6F4", fontSize: 72, fontWeight: 800 },
+          "Live matches & watch links"
+        ),
+        footer
+      ]
+    );
+  }
+
+  const fonts = await Promise.all([interPromise, thunderPromise]);
   const options = {
     width: 1200,
     height: 630,
@@ -246,9 +336,10 @@ export default async function handler(req) {
         : "public, max-age=300, s-maxage=300"
     }
   };
-  if (font) {
-    options.fonts = [{ name: "Inter", data: font, weight: 800, style: "normal" }];
-  }
+  const list = [];
+  if (fonts[0]) list.push({ name: "Inter", data: fonts[0], weight: 800, style: "normal" });
+  if (fonts[1]) list.push({ name: "Racing Sans One", data: fonts[1], weight: 400, style: "normal" });
+  if (list.length) options.fonts = list;
 
   return new ImageResponse(tree, options);
 }

@@ -2,7 +2,7 @@ import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebase
 import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 import { ENV } from "/env.js";
 import { mountLayout } from "/js/layout.js";
-import { logoImg } from "/js/img.js";
+import { logoImg, bgImg } from "/js/img.js";
 
 const app = getApps().length ? getApp() : initializeApp(ENV.firebase);
 const db = getDatabase(app);
@@ -17,6 +17,7 @@ const detail = document.getElementById("detail");
 const shareBtn = document.getElementById("shareBtn");
 const toastEl = document.getElementById("toast");
 
+const CLOCK_ICON = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
 const PLAY_ICON = '<svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>';
 
 function getMatchId() {
@@ -187,6 +188,11 @@ function teamHtml(id) {
   return `<div class="team"><div class="team-logo">${logo}</div><div class="team-name">${name}</div></div>`;
 }
 
+function bgHtml(id) {
+  const t = teamsData[id];
+  return t && t.logourl ? bgImg(t.logourl) : "";
+}
+
 function tagHtml(info) {
   if (info.state === "ended") return '<span class="badge ended">MATCH FINISHED</span>';
   if (info.group === "today") {
@@ -253,9 +259,8 @@ function render() {
   const vsText = (t1 && t1.name ? t1.name : "TBD") + " vs " + (t2 && t2.name ? t2.name : "TBD");
   const mainTitle = match.title ? String(match.title) : "";
   document.title = (mainTitle || vsText) + " - NPLcode";
-  const titleHtml = mainTitle
-    ? `<h1 style="text-align:center;font-size:clamp(1.5rem,6vw,2.4rem);font-weight:900;letter-spacing:-0.03em;line-height:1.1;margin:0 0 18px;word-break:break-word">${esc(mainTitle)}</h1>`
-    : "";
+  const titleHtml = mainTitle ? `<h1 class="match-title">${esc(mainTitle)}</h1>` : "";
+  const timeLabel = info.group !== "today" ? formatDate(match.startTime) + " · " + formatTime(match.startTime) : formatTime(match.startTime);
 
   const linksHtml = info.state === "ended"
     ? '<div class="empty">This match has finished</div>'
@@ -263,16 +268,21 @@ function render() {
 
   detail.innerHTML = `
     <div class="match-card ${info.state === "live" ? "live" : ""}">
+      <div class="bg-split" aria-hidden="true">
+        <div class="half left">${bgHtml(match.team1)}</div>
+        <div class="half right">${bgHtml(match.team2)}</div>
+      </div>
+      <div class="meta">
+        <span class="time-chip">${CLOCK_ICON}${esc(timeLabel)}</span>
+        ${tagHtml(info)}
+      </div>
       ${titleHtml}
       <div class="teams">
         ${teamHtml(match.team1)}
         <div class="vs">VS</div>
         ${teamHtml(match.team2)}
       </div>
-      <div class="info">
-        ${tagHtml(info)}
-        <div class="when">${esc(formatTime(match.startTime))} &middot; ${esc(whenText(match, info, now))}</div>
-      </div>
+      <div class="foot"><span class="foot-left">${esc(whenText(match, info, now))}</span></div>
     </div>
     <div class="section-head"><div class="section-title">Watch links</div></div>
     ${linksHtml}
