@@ -1,7 +1,7 @@
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 import { mountLayout, loadPartial, fillTemplate } from "/js/layout.js";
-import { logoImg } from "/js/img.js";
+import { logoImg, bgImg } from "/js/img.js";
 
 async function loadFirebaseConfig() {
   const mod = await import("/env.js");
@@ -184,7 +184,8 @@ function teamHtml(id) {
   const name = t && t.name ? esc(t.name) : "TBD";
   const letter = t && t.name ? t.name.charAt(0).toUpperCase() : "?";
   const logo = t && t.logourl ? logoImg(t.logourl, letter, true) : esc(letter);
-  return `<div class="team"><div class="team-logo">${logo}</div><div class="team-name">${name}</div></div>`;
+  const bg = t && t.logourl ? bgImg(t.logourl) : "";
+  return `<div class="team">${bg}<div class="team-logo">${logo}</div><div class="team-name">${name}</div></div>`;
 }
 
 function tagHtml(info) {

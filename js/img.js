@@ -31,18 +31,31 @@ export function logoImg(url, letter, lazy) {
   return `<img src="${escAttr(proxyImgUrl(direct))}" data-direct="${escAttr(direct)}" alt="" referrerpolicy="no-referrer" decoding="async"${lazy ? ' loading="lazy"' : ""} data-i="${escAttr(l)}" data-img-fallback>`;
 }
 
+export function bgImg(url) {
+  const direct = normalizeImgUrl(url);
+  if (!direct) return "";
+  return `<img class="team-bg" src="${escAttr(proxyImgUrl(direct))}" data-direct="${escAttr(direct)}" alt="" aria-hidden="true" referrerpolicy="no-referrer" decoding="async" loading="lazy" data-bg-fallback>`;
+}
+
 if (typeof document !== "undefined" && !window.__imgFallbackBound) {
   window.__imgFallbackBound = true;
   document.addEventListener(
     "error",
     (e) => {
       const el = e.target;
-      if (!el || el.tagName !== "IMG" || !el.hasAttribute("data-img-fallback")) return;
+      if (!el || el.tagName !== "IMG") return;
+      const isLogo = el.hasAttribute("data-img-fallback");
+      const isBg = el.hasAttribute("data-bg-fallback");
+      if (!isLogo && !isBg) return;
       const direct = el.getAttribute("data-direct");
       if (direct && !el.hasAttribute("data-tried")) {
         el.setAttribute("data-tried", "1");
         el.setAttribute("referrerpolicy", "no-referrer");
         el.src = direct;
+        return;
+      }
+      if (isBg) {
+        el.remove();
         return;
       }
       el.replaceWith(document.createTextNode(el.getAttribute("data-i") || "?"));
