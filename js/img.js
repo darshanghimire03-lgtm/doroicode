@@ -3,9 +3,16 @@ export function normalizeImgUrl(u) {
   let s = u.trim();
   if (!s) return "";
   if (s.startsWith("//")) s = "https:" + s;
+  if (!/^https?:\/\//i.test(s) && /^[\w-]+(\.[\w-]+)+\//.test(s)) s = "https://" + s;
   s = s.replace(/^http:\/\//i, "https://");
   if (!/^https:\/\//i.test(s)) return "";
   return s;
+}
+
+export function proxyImgUrl(u) {
+  const s = normalizeImgUrl(u);
+  if (!s) return "";
+  return "/api/img?u=" + encodeURIComponent(s);
 }
 
 function escAttr(s) {
@@ -18,10 +25,10 @@ function escAttr(s) {
 }
 
 export function logoImg(url, letter, lazy) {
-  const src = normalizeImgUrl(url);
+  const direct = normalizeImgUrl(url);
   const l = letter || "?";
-  if (!src) return escAttr(l);
-  return `<img src="${escAttr(src)}" alt="" referrerpolicy="no-referrer" decoding="async"${lazy ? ' loading="lazy"' : ""} data-i="${escAttr(l)}" data-img-fallback>`;
+  if (!direct) return escAttr(l);
+  return `<img src="${escAttr(proxyImgUrl(direct))}" data-direct="${escAttr(direct)}" alt="" referrerpolicy="no-referrer" decoding="async"${lazy ? ' loading="lazy"' : ""} data-i="${escAttr(l)}" data-img-fallback>`;
 }
 
 if (typeof document !== "undefined" && !window.__imgFallbackBound) {
@@ -30,9 +37,15 @@ if (typeof document !== "undefined" && !window.__imgFallbackBound) {
     "error",
     (e) => {
       const el = e.target;
-      if (el && el.tagName === "IMG" && el.hasAttribute("data-img-fallback")) {
-        el.replaceWith(document.createTextNode(el.getAttribute("data-i") || "?"));
+      if (!el || el.tagName !== "IMG" || !el.hasAttribute("data-img-fallback")) return;
+      const direct = el.getAttribute("data-direct");
+      if (direct && !el.hasAttribute("data-tried")) {
+        el.setAttribute("data-tried", "1");
+        el.setAttribute("referrerpolicy", "no-referrer");
+        el.src = direct;
+        return;
       }
+      el.replaceWith(document.createTextNode(el.getAttribute("data-i") || "?"));
     },
     true
   );

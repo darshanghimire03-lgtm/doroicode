@@ -34,7 +34,7 @@ function toBase64(bytes) {
 async function logoData(src, origin) {
   if (!src) return null;
   try {
-    const abs = new URL(src, origin + "/").toString();
+    const abs = origin + "/api/img?u=" + encodeURIComponent(String(src).trim());
     const r = await fetch(abs);
     if (!r.ok) return null;
     const bytes = new Uint8Array(await r.arrayBuffer());
