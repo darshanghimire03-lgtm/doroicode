@@ -1,548 +1,79 @@
-
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NPL Live TV</title>
-
-<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
-
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Live TV — Embed Tester</title>
 <style>
 *{box-sizing:border-box}
-
-body{
- margin:0;
- background:#101418;
- color:#fff;
- font-family:Arial,sans-serif;
-}
-
-header{
- padding:18px;
- background:#192127;
- border-bottom:1px solid #303b43;
-}
-
-header h2{margin:0;font-size:21px}
-header p{margin:5px 0 0;color:#9caab5;font-size:12px}
-
-main{
- max-width:950px;
- margin:auto;
- padding:15px;
-}
-
-.player{
- background:#1a222b;
- border:1px solid #303b43;
- border-radius:14px;
- padding:12px;
-}
-
-video{
- width:100%;
- aspect-ratio:16/9;
- background:#000;
- border-radius:9px;
- display:block;
-}
-
-.info{
- display:flex;
- justify-content:space-between;
- align-items:center;
- gap:10px;
- margin-top:12px;
-}
-
-#status{
- font-size:11px;
- padding:6px 9px;
- border-radius:20px;
- background:#34404a;
-}
-
-#message{
- color:#aab7c1;
- font-size:13px;
- line-height:1.5;
- margin:12px 0;
- overflow-wrap:anywhere;
-}
-
-.controls{
- display:flex;
- gap:8px;
- flex-wrap:wrap;
-}
-
-button{
- border:1px solid #35434f;
- border-radius:9px;
- background:#26333e;
- color:white;
- padding:11px 14px;
- cursor:pointer;
-}
-
-button.primary{
- background:#159b83;
- border-color:#159b83;
- color:white;
-}
-
-.channels{
- margin-top:16px;
- background:#1a222b;
- padding:13px;
- border-radius:14px;
- border:1px solid #303b43;
-}
-
-.channel-grid{
- display:grid;
- grid-template-columns:repeat(3,1fr);
- gap:9px;
- margin-top:13px;
-}
-
-.channel{
- text-align:center;
- min-height:48px;
-}
-
-.channel.active{
- background:#15594d;
- border-color:#25b99c;
-}
-
-.channel span{
- display:block;
- font-size:10px;
- color:#aab7c1;
- margin-top:4px;
-}
-
-.diagnostics{
- margin-top:15px;
- background:#1a222b;
- border-radius:12px;
- padding:13px;
- font-size:12px;
- color:#aab7c1;
- overflow-wrap:anywhere;
-}
-
-#log{
- white-space:pre-wrap;
- line-height:1.6;
-}
-
-@media(max-width:450px){
- .channel-grid{grid-template-columns:repeat(2,1fr)}
-}
+body{margin:0;background:#101418;color:#f3f6f8;font:15px system-ui,Arial,sans-serif}
+header{padding:18px;background:#192127;border-bottom:1px solid #303b43}
+h1{font-size:21px;margin:0}header p{margin:5px 0 0;color:#9caab5;font-size:12px}
+main{max-width:900px;margin:auto;padding:15px}
+.panel{background:#1a222b;border:1px solid #303b43;border-radius:14px;padding:13px;margin-bottom:14px}
+.player{width:100%;height:auto;aspect-ratio:16/9;border:0;border-radius:9px;background:#000;display:block}
+.info{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:12px 0}
+#status{font-size:11px;background:#34404a;padding:6px 9px;border-radius:20px}
+#message{font-size:13px;color:#aab7c1;line-height:1.5;overflow-wrap:anywhere}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(95px,1fr));gap:8px;margin-top:12px}
+button{border:1px solid #35434f;border-radius:9px;background:#26333e;color:white;padding:11px;cursor:pointer}
+button.active{background:#15594d;border-color:#25b99c}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+a{color:#8edbcc;overflow-wrap:anywhere}
+.note{font-size:12px;color:#aab7c1;line-height:1.5}
 </style>
 </head>
-
 <body>
-
-<header>
- <h2>NPL Live TV</h2>
- <p>Live streaming player and diagnostics</p>
-</header>
-
+<header><h1>Live TV Embed Tester</h1><p>Tests the YonoTV channel page inside an iframe</p></header>
 <main>
-
- <section class="player">
-
-  <video id="video" controls playsinline></video>
-
-  <div class="info">
-   <strong id="channelName">Select a channel</strong>
-   <span id="status">IDLE</span>
-  </div>
-
-  <div id="message">
-   Select a channel to start watching.
-  </div>
-
-  <div class="controls">
-   <button class="primary" onclick="retry()">Retry</button>
-   <button onclick="stopPlayer()">Stop</button>
-   <button onclick="fullscreen()">Fullscreen</button>
-  </div>
-
- </section>
-
- <section class="channels">
-  <strong>Available Channels</strong>
-  <div class="channel-grid" id="channelGrid"></div>
- </section>
-
- <section class="diagnostics">
-  <strong>Stream diagnostics</strong>
-  <div id="log">Waiting for stream...</div>
- </section>
-
+<section class="panel">
+<iframe id="player" class="player" src="https://yonotv.pages.dev/LINK?id=NP2"
+ title="YonoTV live player" allow="autoplay; fullscreen; picture-in-picture"
+ allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
+<div class="info"><strong id="channelName">NP2</strong><span id="status">IFRAME LOADED</span></div>
+<div id="message">The YonoTV player page has been embedded. Use its own controls to start playback.</div>
+<div class="actions">
+<button onclick="reloadPlayer()">Reload channel</button>
+<button onclick="openDirect()">Open YonoTV directly</button>
+</div>
+</section>
+<section class="panel">
+<strong>Choose channel ID</strong>
+<div class="grid" id="channels"></div>
+<p class="note">The screenshot you supplied shows the working page route <code>https://yonotv.pages.dev/LINK?id=NP2</code>. This tester uses the same iframe route and changes only the ID. The screenshot confirms NP2; other IDs work only if YonoTV supports them.</p>
+</section>
+<section class="panel">
+<strong>Embedding limitations</strong>
+<p class="note">If the player area stays blank or says the page refused to connect, YonoTV may block iframe embedding through its security headers. In that case, use the direct YonoTV page instead. This page cannot inspect errors occurring inside a cross-origin iframe.</p>
+<p class="note">Direct link: <a href="https://yonotv.pages.dev/LINK?id=NP2" target="_blank" rel="noopener">Open YonoTV NP2</a></p>
+</section>
 </main>
-
 <script>
-
-// CHANNEL DATABASE
-
-const streamMap = {
-
- MAX:{
-  url:"https://webott.viatv.com.np/v0t1/KntCineplexTv.stream/playlist.m3u8",
-  poster:"https://www.shutterstock.com/shutterstock/videos/3709338167/thumb/6.jpg"
- },
-
- MAX2:{
-  url:"https://yono.b-cdn.net/hls/yono.m3u8",
-  poster:"https://www.shutterstock.com/shutterstock/videos/3709338167/thumb/6.jpg"
- },
-
- NP:{
-  url:"https://hugh.cdn.rumble.cloud/live/gi29le7p/slot-39/knne-tgf8/playlist.m3u8",
-  poster:"https://i.postimg.cc/x1XsRf68/NEPAL-VS-IRAN-FOOTBALL-WOMENS.png"
- },
-
- NP2:{
-  url:"https://rumble-foxo.cdn.rumble.cloud/live/gi29le7p/slot-39/knne-tgf8/playlist.m3u8",
-  poster:"https://www.shutterstock.com/shutterstock/videos/3709338167/thumb/6.jpg"
- },
-
- IND:{
-  url:"https://hugh.cdn.rumble.cloud/live/y16rq9u0/slot-21/8wef-hiy9/playlist.m3u8",
-  poster:"https://nirutv.online/logo/image.png"
- },
-
- IND2:{
-  url:"https://live-en.aisports.cc/moviebox/device02/playlist.m3u8",
-  poster:"https://nirutv.online/logo/image.png"
- },
-
- WOMENS:{
-  url:"https://hugh.cdn.rumble.cloud/live/t5qc33px/slot-131/k3xj-agbx/chunklist.m3u8",
-  poster:"https://styxsports.b-cdn.net/styxsports-public/matches/1759219336927-448368236.webp"
- },
-
- S1:{
-  url:"https://rumble-foxo.cdn.rumble.cloud/live/r31jzt5k/slot-125/ci5t-x7f0/playlist.m3u8",
-  poster:""
- },
-
- WCC:{
-  url:"https://live-en.aisports.cc/moviebox/device01/playlist.m3u8",
-  poster:"https://nirutv.online/logo/image.png"
- },
-
- ACC:{
-  url:"https://live-en.aisports.cc/moviebox/device01/playlist.m3u8",
-  poster:"https://img.jagranjosh.com/images/2025/09/27/article/image/Untitled-design-(73)-1758966052512.webp"
- }
-
-};
-
-
-// PLAYER VARIABLES
-
-const video=document.getElementById("video");
-const statusEl=document.getElementById("status");
-const message=document.getElementById("message");
-const log=document.getElementById("log");
-
-let hls=null;
-let currentChannel=null;
-let timeout=null;
-let playing=false;
-
-
-// UI STATUS
-
-function updateStatus(status,text){
-
- statusEl.textContent=status;
- message.textContent=text;
- log.textContent=status+": "+text;
-
-}
-
-
-// STOP PLAYER
-
-function stopPlayer(){
-
- clearTimeout(timeout);
-
- if(hls){
-  hls.destroy();
-  hls=null;
- }
-
- video.pause();
- video.removeAttribute("src");
- video.load();
-
- playing=false;
-
- updateStatus("STOPPED","Playback stopped.");
-
-}
-
-
-// PLAY CHANNEL
-
-function playChannel(id){
-
- const channel=streamMap[id];
-
- if(!channel){
-  updateStatus("ERROR","Channel not found.");
-  return;
- }
-
- currentChannel=id;
-
- stopPlayer();
-
+const ids=["MAX","MAX2","NP","NP2","IND","IND2","WOMENS","S1","WCC","ACC"];
+const frame=document.getElementById("player");
+let current="NP2";
+function selectChannel(id){
+ current=id;
+ frame.src="https://yonotv.pages.dev/LINK?id="+encodeURIComponent(id);
  document.getElementById("channelName").textContent=id;
-
- document.querySelectorAll(".channel").forEach(btn=>{
-  btn.classList.toggle("active",btn.dataset.id===id);
- });
-
- if(channel.poster){
-  video.poster=channel.poster;
- }else{
-  video.removeAttribute("poster");
- }
-
- updateStatus("CONNECTING","Connecting to stream: "+id);
-
- timeout=setTimeout(()=>{
-
-  if(!playing){
-   updateStatus(
-    "TIMEOUT",
-    "No playable video received. The provider may be unavailable or blocking access."
-   );
-  }
-
- },20000);
-
-
- // HLS.JS PLAYBACK
-
- if(window.Hls && Hls.isSupported()){
-
-  hls=new Hls({
-   enableWorker:true,
-   debug:false,
-   manifestLoadingTimeOut:12000,
-   levelLoadingTimeOut:12000,
-   fragLoadingTimeOut:15000
-  });
-
-  hls.on(Hls.Events.MEDIA_ATTACHED,()=>{
-
-   hls.loadSource(channel.url);
-
-  });
-
-
-  hls.on(Hls.Events.MANIFEST_PARSED,()=>{
-
-   updateStatus(
-    "PLAYLIST OK",
-    "Playlist loaded. Waiting for video segments."
-   );
-
-   video.play().catch(()=>{
-
-    updateStatus(
-     "READY",
-     "Playlist loaded. Press the video play button."
-    );
-
-   });
-
-  });
-
-
-  hls.on(Hls.Events.FRAG_BUFFERED,()=>{
-
-   markPlayable();
-
-  });
-
-
-  hls.on(Hls.Events.ERROR,(event,data)=>{
-
-   if(!data.fatal){
-
-    log.textContent="HLS warning: "+data.details;
-    return;
-
-   }
-
-   clearTimeout(timeout);
-
-   const code=data.response?.code || "Unknown";
-   const details=data.details || data.type;
-
-   if(data.type===Hls.ErrorTypes.NETWORK_ERROR){
-
-    updateStatus(
-     "NETWORK ERROR",
-     "Could not fetch stream. HTTP status: "+code+
-     ". Check provider availability and CORS permissions."
-    );
-
-   }
-
-   else if(data.type===Hls.ErrorTypes.MEDIA_ERROR){
-
-    updateStatus(
-     "RECOVERING",
-     "Trying to recover media decoding error."
-    );
-
-    hls.recoverMediaError();
-
-   }
-
-   else{
-
-    updateStatus(
-     "PLAYBACK ERROR",
-     details
-    );
-
-   }
-
-  });
-
-
-  hls.attachMedia(video);
-
- }
-
- // NATIVE HLS
-
- else if(video.canPlayType("application/vnd.apple.mpegurl")){
-
-  video.src=channel.url;
-
-  video.addEventListener("loadedmetadata",()=>{
-
-   updateStatus(
-    "PLAYLIST OK",
-    "Native HLS playlist loaded."
-   );
-
-   video.play().catch(()=>{});
-
-  },{once:true});
-
-  video.addEventListener("playing",markPlayable,{once:true});
-
-  video.addEventListener("error",()=>{
-
-   updateStatus(
-    "ERROR",
-    "Browser could not play this stream."
-   );
-
-  },{once:true});
-
- }
-
- else{
-
-  clearTimeout(timeout);
-
-  updateStatus(
-   "UNSUPPORTED",
-   "This browser does not support HLS."
-  );
-
- }
-
+ document.getElementById("status").textContent="LOADING";
+ document.getElementById("message").textContent="Loading YonoTV player for "+id+". If it does not appear, this ID may not be available on YonoTV.";
+ document.querySelectorAll("button[data-id]").forEach(b=>b.classList.toggle("active",b.dataset.id===id));
 }
-
-
-// PLAYABLE STATUS
-
-function markPlayable(){
-
- if(playing)return;
-
- playing=true;
- clearTimeout(timeout);
-
- updateStatus(
-  "PLAYABLE",
-  "Video data successfully reached the player."
- );
-
-}
-
-video.addEventListener("playing",markPlayable);
-
-
-// RETRY
-
-function retry(){
-
- if(currentChannel){
-  playChannel(currentChannel);
- }
-
-}
-
-
-// FULLSCREEN
-
-function fullscreen(){
-
- if(video.requestFullscreen){
-  video.requestFullscreen();
- }else if(video.webkitEnterFullscreen){
-  video.webkitEnterFullscreen();
- }
-
-}
-
-
-// CREATE CHANNEL BUTTONS
-
-const grid=document.getElementById("channelGrid");
-
-Object.keys(streamMap).forEach(id=>{
-
- const button=document.createElement("button");
-
- button.className="channel";
- button.dataset.id=id;
- button.textContent=id;
-
- button.onclick=()=>playChannel(id);
-
- grid.appendChild(button);
-
+function reloadPlayer(){selectChannel(current)}
+function openDirect(){window.open("https://yonotv.pages.dev/LINK?id="+encodeURIComponent(current),"_blank","noopener")}
+frame.addEventListener("load",()=>{
+ document.getElementById("status").textContent="IFRAME LOADED";
+ document.getElementById("message").textContent="The embedded page loaded. This does not guarantee the video stream itself is playing.";
 });
-
-
-// INITIAL STATUS
-
-updateStatus(
- "READY",
- "Select a channel to test playback."
-);
-
+const grid=document.getElementById("channels");
+ids.forEach(id=>{
+ const b=document.createElement("button");
+ b.textContent=id;b.dataset.id=id;
+ b.className=id==="NP2"?"active":"";
+ b.addEventListener("click",()=>selectChannel(id));
+ grid.appendChild(b);
+});
 </script>
-
 </body>
 </html>
