@@ -3,77 +3,77 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Live TV — Embed Tester</title>
+<title>YonoTV Embed Tester</title>
 <style>
-*{box-sizing:border-box}
-body{margin:0;background:#101418;color:#f3f6f8;font:15px system-ui,Arial,sans-serif}
-header{padding:18px;background:#192127;border-bottom:1px solid #303b43}
-h1{font-size:21px;margin:0}header p{margin:5px 0 0;color:#9caab5;font-size:12px}
-main{max-width:900px;margin:auto;padding:15px}
-.panel{background:#1a222b;border:1px solid #303b43;border-radius:14px;padding:13px;margin-bottom:14px}
-.player{width:100%;height:auto;aspect-ratio:16/9;border:0;border-radius:9px;background:#000;display:block}
+*{box-sizing:border-box}body{margin:0;background:#101418;color:#f3f6f8;font:15px system-ui,Arial,sans-serif}
+header{padding:18px;background:#192127;border-bottom:1px solid #303b43}h1{font-size:21px;margin:0}header p{margin:5px 0 0;color:#9caab5;font-size:12px}
+main{max-width:900px;margin:auto;padding:15px}.panel{background:#1a222b;border:1px solid #303b43;border-radius:14px;padding:13px;margin-bottom:14px}
+iframe{width:100%;height:min(70vh,650px);min-height:360px;border:0;border-radius:9px;background:#000;display:block}
 .info{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:12px 0}
 #status{font-size:11px;background:#34404a;padding:6px 9px;border-radius:20px}
-#message{font-size:13px;color:#aab7c1;line-height:1.5;overflow-wrap:anywhere}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(95px,1fr));gap:8px;margin-top:12px}
+#message,.note{font-size:13px;color:#aab7c1;line-height:1.5;overflow-wrap:anywhere}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-top:12px}
 button{border:1px solid #35434f;border-radius:9px;background:#26333e;color:white;padding:11px;cursor:pointer}
 button.active{background:#15594d;border-color:#25b99c}
 .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 a{color:#8edbcc;overflow-wrap:anywhere}
-.note{font-size:12px;color:#aab7c1;line-height:1.5}
+code{overflow-wrap:anywhere;color:#c3e8df}
 </style>
 </head>
 <body>
-<header><h1>Live TV Embed Tester</h1><p>Tests the YonoTV channel page inside an iframe</p></header>
+<header><h1>YonoTV Embed Tester</h1><p>Uses the YonoTV home wrapper and its src parameter</p></header>
 <main>
 <section class="panel">
-<iframe id="player" class="player" src="https://yonotv.pages.dev/LINK?id=NP2"
- title="YonoTV live player" allow="autoplay; fullscreen; picture-in-picture"
- allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
-<div class="info"><strong id="channelName">NP2</strong><span id="status">IFRAME LOADED</span></div>
-<div id="message">The YonoTV player page has been embedded. Use its own controls to start playback.</div>
+<iframe id="player" title="YonoTV player" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
+<div class="info"><strong id="channelName">NP4</strong><span id="status">LOADING</span></div>
+<div id="message">Loading the exact YonoTV URL you provided.</div>
 <div class="actions">
-<button onclick="reloadPlayer()">Reload channel</button>
-<button onclick="openDirect()">Open YonoTV directly</button>
+<button onclick="reloadPlayer()">Reload</button>
+<button onclick="openDirect()">Open in new tab</button>
 </div>
 </section>
 <section class="panel">
-<strong>Choose channel ID</strong>
+<strong>Channel IDs</strong>
 <div class="grid" id="channels"></div>
-<p class="note">The screenshot you supplied shows the working page route <code>https://yonotv.pages.dev/LINK?id=NP2</code>. This tester uses the same iframe route and changes only the ID. The screenshot confirms NP2; other IDs work only if YonoTV supports them.</p>
+<p class="note">Selected channel opens as <code>https://yonotv.pages.dev/home?src=</code> followed by the encoded <code>https://yonotv.pages.dev/LINK?id=CHANNEL</code> URL. Only IDs supported by YonoTV will work.</p>
 </section>
 <section class="panel">
-<strong>Embedding limitations</strong>
-<p class="note">If the player area stays blank or says the page refused to connect, YonoTV may block iframe embedding through its security headers. In that case, use the direct YonoTV page instead. This page cannot inspect errors occurring inside a cross-origin iframe.</p>
-<p class="note">Direct link: <a href="https://yonotv.pages.dev/LINK?id=NP2" target="_blank" rel="noopener">Open YonoTV NP2</a></p>
+<strong>Embedding note</strong>
+<p class="note">“Iframe loaded” only confirms that the page loaded; it cannot confirm playback inside a cross-origin frame. If YonoTV blocks iframe embedding, use “Open in new tab”.</p>
+<p class="note">Exact NP4 page: <a href="https://yonotv.pages.dev/home?src=https://yonotv.pages.dev/LINK?id=NP4" target="_blank" rel="noopener">Open YonoTV NP4</a></p>
 </section>
 </main>
 <script>
-const ids=["MAX","MAX2","NP","NP2","IND","IND2","WOMENS","S1","WCC","ACC"];
+const ids=["MAX","MAX2","NP","NP2","NP4","IND","IND2","WOMENS","S1","WCC","ACC"];
 const frame=document.getElementById("player");
-let current="NP2";
+let current="NP4";
+function makeUrl(id){
+ const inner="https://yonotv.pages.dev/LINK?id="+encodeURIComponent(id);
+ return "https://yonotv.pages.dev/home?src="+encodeURIComponent(inner);
+}
 function selectChannel(id){
  current=id;
- frame.src="https://yonotv.pages.dev/LINK?id="+encodeURIComponent(id);
+ frame.src=makeUrl(id);
  document.getElementById("channelName").textContent=id;
  document.getElementById("status").textContent="LOADING";
- document.getElementById("message").textContent="Loading YonoTV player for "+id+". If it does not appear, this ID may not be available on YonoTV.";
+ document.getElementById("message").textContent="Loading YonoTV home wrapper for channel "+id+".";
  document.querySelectorAll("button[data-id]").forEach(b=>b.classList.toggle("active",b.dataset.id===id));
 }
 function reloadPlayer(){selectChannel(current)}
-function openDirect(){window.open("https://yonotv.pages.dev/LINK?id="+encodeURIComponent(current),"_blank","noopener")}
+function openDirect(){window.open(makeUrl(current),"_blank","noopener")}
 frame.addEventListener("load",()=>{
- document.getElementById("status").textContent="IFRAME LOADED";
- document.getElementById("message").textContent="The embedded page loaded. This does not guarantee the video stream itself is playing.";
+ document.getElementById("status").textContent="PAGE LOADED";
+ document.getElementById("message").textContent="YonoTV page loaded in the frame. This does not confirm that the video itself is playing.";
 });
 const grid=document.getElementById("channels");
 ids.forEach(id=>{
  const b=document.createElement("button");
  b.textContent=id;b.dataset.id=id;
- b.className=id==="NP2"?"active":"";
+ if(id==="NP4")b.classList.add("active");
  b.addEventListener("click",()=>selectChannel(id));
  grid.appendChild(b);
 });
+selectChannel("NP4");
 </script>
 </body>
 </html>
