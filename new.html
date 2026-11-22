@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live Stream Tester</title>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
+<style>
+:root{color-scheme:dark;--bg:#101418;--panel:#1a222b;--line:#2b3743;--text:#f3f6fa;--muted:#9aa8b6;--accent:#48b6a4}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:850px;margin:auto;padding:22px 16px 40px}.head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+h1{font-size:22px;margin:0}.sub{color:var(--muted);font-size:13px;margin:6px 0 18px}
+.layout{display:grid;grid-template-columns: minmax(0,1.5fr) minmax(230px,1fr);gap:14px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;min-width:0}
+video{width:100%;aspect-ratio:16/9;background:#050708;border-radius:10px;display:block}
+.now{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:12px 0 5px}
+#channelName{font-weight:700}.status{font-size:12px;color:var(--muted)}
+#message{font-size:13px;color:var(--muted);min-height:36px;margin-top:8px;line-height:1.5}
+.channels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:#202b35;color:var(--text);border-radius:9px;padding:10px;text-align:left}
+button.active{border-color:var(--accent);background:#173a38}
+button:disabled{opacity:.5;cursor:not-allowed}
+.small{display:block;color:var(--muted);font-size:11px;margin-top:3px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.actions button{font-size:13px;text-align:center}
+#testAll{background:var(--accent);color:#06211d;border:0;font-weight:700}
+.note{color:var(--muted);font-size:12px;line-height:1.5;margin-top:14px}
+@media(max-width:650px){.layout{grid-template-columns:1fr}.channels{grid-template-columns:repeat(3,minmax(0,1fr))}button{padding:9px 7px;font-size:13px}}
+</style>
+</head>
+<body>
+<main>
+  <div class="head"><h1>Live Stream Tester</h1><span class="status">HLS / M3U8 checker</span></div>
+  <p class="sub">Select a channel to test its stream in this browser.</p>
+  <div class="layout">
+    <section class="panel">
+      <video id="video" controls playsinline></video>
+      <div class="now"><span id="channelName">No channel selected</span><span id="status" class="status">Idle</span></div>
+      <div id="message">Choose a channel to begin.</div>
+      <div class="actions">
+        <button id="retry">Retry current stream</button>
+        <button id="stop">Stop playback</button>
+      </div>
+    </section>
+    <aside class="panel">
+      <div class="head" style="margin-bottom:12px"><strong>Channels</strong><button id="testAll">Test all</button></div>
+      <div class="channels" id="channels"></div>
+      <p class="note">A stream is marked playable only after the player can load media. A timeout or browser/CORS restriction does not always mean the source itself is offline.</p>
+    </aside>
+  </div>
+</main>
+<script>
+const streamMap = {
+  "MAX": {url:"https://webott.viatv.com.np/v0t1/KntCineplexTv.stream/playlist.m3u8",poster:"https://www.shutterstock.com/shutterstock/videos/3709338167/thumb/6.jpg"},
+  "MAX2": {url:"https://yono.b-cdn.net/hls/yono.m3u8",poster:"https://www.shutterstock.com/shutterstock/videos/3709338167/thumb/6.jpg"},
+  "NP": {url:"https://hugh.cdn.rumble.cloud/live/gi29le7p/slot-39/knne-tgf8/playlist.m3u8",poster:"https://i.postimg.cc/x1XsRf68/NEPAL-VS-IRAN-FOOTBALL-WOMENS.png"},
+  "NP2": {url:"https://rumble-foxo.cdn.rumble.cloud/live/gi29le7p/slot-39/knne-tgf8/playlist.m3u8",poster:"https://www.shutterstock.com/shutterstock/videos/3709338167/thumb/6.jpg"},
+  "IND": {url:"https://hugh.cdn.rumble.cloud/live/y16rq9u0/slot-21/8wef-hiy9/playlist.m3u8",poster:"https://nirutv.online/logo/image.png"},
+  "IND2": {url:"https://live-en.aisports.cc/moviebox/device02/playlist.m3u8",poster:"https://nirutv.online/logo/image.png"},
+  "WOMENS": {url:"https://hugh.cdn.rumble.cloud/live/t5qc33px/slot-131/k3xj-agbx/chunklist.m3u8",poster:"https://styxsports.b-cdn.net/styxsports-public/matches/1759219336927-448368236.webp"},
+  "S1": {url:"https://rumble-foxo.cdn.rumble.cloud/live/r31jzt5k/slot-125/ci5t-x7f0/playlist.m3u8",poster:""},
+  "WCC": {url:"https://live-en.aisports.cc/moviebox/device01/playlist.m3u8",poster:"https://nirutv.online/logo/image.png"},
+  "ACC": {url:"https://live-en.aisports.cc/moviebox/device01/playlist.m3u8",poster:"https://img.jagranjosh.com/images/2025/09/27/article/image/Untitled-design-(73)-1758966052512.webp"}
+};
+
+const video=document.getElementById("video"), statusEl=document.getElementById("status"), message=document.getElementById("message"), nameEl=document.getElementById("channelName");
+let hls=null,current=null,watchdog=null,started=false;
+const buttons={};
+
+function setStatus(label,detail){statusEl.textContent=label;message.textContent=detail||""}
+function cleanup(){clearTimeout(watchdog);if(hls){hls.destroy();hls=null}video.pause();video.removeAttribute("src");video.load();started=false}
+function mark(id,label){const b=buttons[id];if(b){b.querySelector(".small").textContent=label}}
+function playChannel(id){
+  current=id;cleanup();
+  const item=streamMap[id];nameEl.textContent=id;
+  document.querySelectorAll(".channels button").forEach(b=>b.classList.toggle("active",b.dataset.id===id));
+  if(item.poster)video.poster=item.poster;else video.removeAttribute("poster");
+  setStatus("Loading…","Requesting playlist and media segments. This may take a few seconds.");
+  mark(id,"Checking…");
+  watchdog=setTimeout(()=>{if(!started){setStatus("Timed out","No playable media detected. The URL may be offline, blocked, or slow.");mark(id,"Timeout")}},15000);
+
+  if(window.Hls && Hls.isSupported()){
+    hls=new Hls({enableWorker:true});
+    hls.on(Hls.Events.MEDIA_ATTACHED,()=>hls.loadSource(item.url));
+    hls.on(Hls.Events.MANIFEST_PARSED,()=>{
+      setStatus("Playlist loaded","Playlist parsed. Waiting for video data…");
+      video.play().catch(()=>setStatus("Ready — press play","The playlist loaded, but autoplay was blocked by the browser."));
+    });
+    hls.on(Hls.Events.FRAG_BUFFERED,()=>{
+      if(!started){started=true;clearTimeout(watchdog);setStatus("Playable","Video data loaded successfully.");mark(id,"Playable")}
+    });
+    hls.on(Hls.Events.ERROR,(_,data)=>{
+      if(data.fatal){
+        clearTimeout(watchdog);
+        setStatus("Playback error",data.details||data.type||"Fatal HLS error");
+        mark(id,"Error");
+        if(data.type===Hls.ErrorTypes.NETWORK_ERROR)setStatus("Network error","The playlist/segments could not be loaded. Check URL, server access and CORS.");
+      }
+    });
+    hls.attachMedia(video);
+  } else if(video.canPlayType("application/vnd.apple.mpegurl")){
+    video.src=item.url;
+    video.addEventListener("loadedmetadata",()=>{setStatus("Playlist loaded","Native HLS support detected.");video.play().catch(()=>setStatus("Ready — press play","Press play to start."))},{once:true});
+    video.addEventListener("playing",()=>{started=true;clearTimeout(watchdog);setStatus("Playable","Video is playing.");mark(id,"Playable")},{once:true});
+    video.addEventListener("error",()=>{clearTimeout(watchdog);setStatus("Playback error","The browser could not play this stream.");mark(id,"Error")},{once:true});
+  } else {
+    clearTimeout(watchdog);setStatus("Not supported","This browser does not support HLS playback through this page.");mark(id,"Unsupported");
+  }
+}
+function stop(){cleanup();setStatus("Stopped","Playback stopped.");}
+Object.keys(streamMap).forEach(id=>{
+  const b=document.createElement("button");b.dataset.id=id;b.innerHTML=`${id}<span class="small">Not tested</span>`;
+  b.addEventListener("click",()=>playChannel(id));buttons[id]=b;document.getElementById("channels").appendChild(b);
+});
+document.getElementById("retry").addEventListener("click",()=>{if(current)playChannel(current)});
+document.getElementById("stop").addEventListener("click",stop);
+document.getElementById("testAll").addEventListener("click",async()=>{
+  const ids=Object.keys(streamMap);
+  for(const id of ids){playChannel(id);await new Promise(r=>setTimeout(r,16000))}
+  setStatus("Test sequence finished","Review each channel's status in the channel list.");
+});
+video.addEventListener("playing",()=>{if(current&&!started){started=true;clearTimeout(watchdog);setStatus("Playable","Video is playing.");mark(current,"Playable")}});
+video.addEventListener("waiting",()=>{if(started)setStatus("Buffering","The player is waiting for more video data.")});
+</script>
+</body>
+</html>
