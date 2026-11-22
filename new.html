@@ -1,107 +1,548 @@
-<!doctype html>
+
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Live Stream Checker</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NPL Live TV</title>
+
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
+
 <style>
-*{box-sizing:border-box}body{margin:0;background:#10151b;color:#f3f6f8;font:15px system-ui,Arial,sans-serif}
-main{max-width:900px;margin:auto;padding:20px 14px 40px}h1{font-size:22px;margin:0}p{color:#aab6c2;line-height:1.5}
-.panel{background:#19232d;border:1px solid #2b3946;border-radius:14px;padding:14px;margin-top:14px}
-video{width:100%;aspect-ratio:16/9;background:#05080b;border-radius:10px;display:block}
-.row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0}
-#status{font-size:12px;padding:5px 9px;border-radius:30px;background:#34404c;color:#fff}
-#detail{font-size:13px;min-height:38px;color:#b9c5cf;overflow-wrap:anywhere}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(95px,1fr));gap:8px}
-button{border:1px solid #344452;border-radius:9px;background:#24313d;color:#f4f7fa;padding:10px;min-height:42px;font:inherit;text-align:left}
-button:active,button.active{border-color:#49c5ad;background:#17433d}
-button .state{display:block;font-size:11px;color:#aab6c2;margin-top:3px}
-.actions button{font-size:13px;text-align:center}
-#retry{background:#176c5c;border-color:#238875}
-.warn{border-left:3px solid #e2ad4c;padding:9px 11px;background:#332b1c;border-radius:6px;font-size:13px;color:#f3dfb9}
-.good{color:#80e0bd}.bad{color:#ff9b9b}
-code{overflow-wrap:anywhere;color:#c3e8df}
+*{box-sizing:border-box}
+
+body{
+ margin:0;
+ background:#101418;
+ color:#fff;
+ font-family:Arial,sans-serif;
+}
+
+header{
+ padding:18px;
+ background:#192127;
+ border-bottom:1px solid #303b43;
+}
+
+header h2{margin:0;font-size:21px}
+header p{margin:5px 0 0;color:#9caab5;font-size:12px}
+
+main{
+ max-width:950px;
+ margin:auto;
+ padding:15px;
+}
+
+.player{
+ background:#1a222b;
+ border:1px solid #303b43;
+ border-radius:14px;
+ padding:12px;
+}
+
+video{
+ width:100%;
+ aspect-ratio:16/9;
+ background:#000;
+ border-radius:9px;
+ display:block;
+}
+
+.info{
+ display:flex;
+ justify-content:space-between;
+ align-items:center;
+ gap:10px;
+ margin-top:12px;
+}
+
+#status{
+ font-size:11px;
+ padding:6px 9px;
+ border-radius:20px;
+ background:#34404a;
+}
+
+#message{
+ color:#aab7c1;
+ font-size:13px;
+ line-height:1.5;
+ margin:12px 0;
+ overflow-wrap:anywhere;
+}
+
+.controls{
+ display:flex;
+ gap:8px;
+ flex-wrap:wrap;
+}
+
+button{
+ border:1px solid #35434f;
+ border-radius:9px;
+ background:#26333e;
+ color:white;
+ padding:11px 14px;
+ cursor:pointer;
+}
+
+button.primary{
+ background:#159b83;
+ border-color:#159b83;
+ color:white;
+}
+
+.channels{
+ margin-top:16px;
+ background:#1a222b;
+ padding:13px;
+ border-radius:14px;
+ border:1px solid #303b43;
+}
+
+.channel-grid{
+ display:grid;
+ grid-template-columns:repeat(3,1fr);
+ gap:9px;
+ margin-top:13px;
+}
+
+.channel{
+ text-align:center;
+ min-height:48px;
+}
+
+.channel.active{
+ background:#15594d;
+ border-color:#25b99c;
+}
+
+.channel span{
+ display:block;
+ font-size:10px;
+ color:#aab7c1;
+ margin-top:4px;
+}
+
+.diagnostics{
+ margin-top:15px;
+ background:#1a222b;
+ border-radius:12px;
+ padding:13px;
+ font-size:12px;
+ color:#aab7c1;
+ overflow-wrap:anywhere;
+}
+
+#log{
+ white-space:pre-wrap;
+ line-height:1.6;
+}
+
+@media(max-width:450px){
+ .channel-grid{grid-template-columns:repeat(2,1fr)}
+}
 </style>
 </head>
-<body><main>
-<h1>Live Stream Checker</h1>
-<p>Choose a channel. The page checks whether the browser can load its HLS playlist and video segments.</p>
-<div class="warn" id="originWarning" hidden>You're opening this as a local file. For a fair test, upload it to HTTPS hosting (such as Vercel) and open the deployed URL. Some stream servers reject local-file requests or cross-origin browser requests.</div>
-<section class="panel">
-<video id="video" controls playsinline></video>
-<div class="row"><strong id="selected">No channel selected</strong><span id="status">IDLE</span></div>
-<div id="detail" aria-live="polite">Select a channel below to start testing.</div>
-<div class="row actions">
-<button id="retry">Retry</button><button id="stop">Stop</button>
-</div>
-</section>
-<section class="panel">
-<div class="row"><strong>Channels</strong><span style="font-size:12px;color:#aab6c2">10 sources</span></div>
-<div class="grid" id="channels"></div>
-</section>
-<section class="panel">
-<strong>Diagnostic log</strong>
-<p id="log" style="font-size:12px;overflow-wrap:anywhere">Waiting for a channel.</p>
-<p style="font-size:12px">“Playable” means video data reached the player. “CORS / network blocked” means the browser could not access the source; this cannot be fixed by changing the video player alone.</p>
-</section>
+
+<body>
+
+<header>
+ <h2>NPL Live TV</h2>
+ <p>Live streaming player and diagnostics</p>
+</header>
+
+<main>
+
+ <section class="player">
+
+  <video id="video" controls playsinline></video>
+
+  <div class="info">
+   <strong id="channelName">Select a channel</strong>
+   <span id="status">IDLE</span>
+  </div>
+
+  <div id="message">
+   Select a channel to start watching.
+  </div>
+
+  <div class="controls">
+   <button class="primary" onclick="retry()">Retry</button>
+   <button onclick="stopPlayer()">Stop</button>
+   <button onclick="fullscreen()">Fullscreen</button>
+  </div>
+
+ </section>
+
+ <section class="channels">
+  <strong>Available Channels</strong>
+  <div class="channel-grid" id="channelGrid"></div>
+ </section>
+
+ <section class="diagnostics">
+  <strong>Stream diagnostics</strong>
+  <div id="log">Waiting for stream...</div>
+ </section>
+
 </main>
+
 <script>
+
+// CHANNEL DATABASE
+
 const streamMap = {
-"MAX":{url:"https://webott.viatv.com.np/v0t1/KntCineplexTv.stream/playlist.m3u8",poster:"https://www.shutterstock.com/shutterstock/videos/3709338167/thumb/6.jpg"},
-"MAX2":{url:"https://yono.b-cdn.net/hls/yono.m3u8",poster:"https://www.shutterstock.com/shutterstock/videos/3709338167/thumb/6.jpg"},
-"NP":{url:"https://hugh.cdn.rumble.cloud/live/gi29le7p/slot-39/knne-tgf8/playlist.m3u8",poster:"https://i.postimg.cc/x1XsRf68/NEPAL-VS-IRAN-FOOTBALL-WOMENS.png"},
-"NP2":{url:"https://rumble-foxo.cdn.rumble.cloud/live/gi29le7p/slot-39/knne-tgf8/playlist.m3u8",poster:"https://www.shutterstock.com/shutterstock/videos/3709338167/thumb/6.jpg"},
-"IND":{url:"https://hugh.cdn.rumble.cloud/live/y16rq9u0/slot-21/8wef-hiy9/playlist.m3u8",poster:"https://nirutv.online/logo/image.png"},
-"IND2":{url:"https://live-en.aisports.cc/moviebox/device02/playlist.m3u8",poster:"https://nirutv.online/logo/image.png"},
-"WOMENS":{url:"https://hugh.cdn.rumble.cloud/live/t5qc33px/slot-131/k3xj-agbx/chunklist.m3u8",poster:"https://styxsports.b-cdn.net/styxsports-public/matches/1759219336927-448368236.webp"},
-"S1":{url:"https://rumble-foxo.cdn.rumble.cloud/live/r31jzt5k/slot-125/ci5t-x7f0/playlist.m3u8",poster:""},
-"WCC":{url:"https://live-en.aisports.cc/moviebox/device01/playlist.m3u8",poster:"https://nirutv.online/logo/image.png"},
-"ACC":{url:"https://live-en.aisports.cc/moviebox/device01/playlist.m3u8",poster:"https://img.jagranjosh.com/images/2025/09/27/article/image/Untitled-design-(73)-1758966052512.webp"}
+
+ MAX:{
+  url:"https://webott.viatv.com.np/v0t1/KntCineplexTv.stream/playlist.m3u8",
+  poster:"https://www.shutterstock.com/shutterstock/videos/3709338167/thumb/6.jpg"
+ },
+
+ MAX2:{
+  url:"https://yono.b-cdn.net/hls/yono.m3u8",
+  poster:"https://www.shutterstock.com/shutterstock/videos/3709338167/thumb/6.jpg"
+ },
+
+ NP:{
+  url:"https://hugh.cdn.rumble.cloud/live/gi29le7p/slot-39/knne-tgf8/playlist.m3u8",
+  poster:"https://i.postimg.cc/x1XsRf68/NEPAL-VS-IRAN-FOOTBALL-WOMENS.png"
+ },
+
+ NP2:{
+  url:"https://rumble-foxo.cdn.rumble.cloud/live/gi29le7p/slot-39/knne-tgf8/playlist.m3u8",
+  poster:"https://www.shutterstock.com/shutterstock/videos/3709338167/thumb/6.jpg"
+ },
+
+ IND:{
+  url:"https://hugh.cdn.rumble.cloud/live/y16rq9u0/slot-21/8wef-hiy9/playlist.m3u8",
+  poster:"https://nirutv.online/logo/image.png"
+ },
+
+ IND2:{
+  url:"https://live-en.aisports.cc/moviebox/device02/playlist.m3u8",
+  poster:"https://nirutv.online/logo/image.png"
+ },
+
+ WOMENS:{
+  url:"https://hugh.cdn.rumble.cloud/live/t5qc33px/slot-131/k3xj-agbx/chunklist.m3u8",
+  poster:"https://styxsports.b-cdn.net/styxsports-public/matches/1759219336927-448368236.webp"
+ },
+
+ S1:{
+  url:"https://rumble-foxo.cdn.rumble.cloud/live/r31jzt5k/slot-125/ci5t-x7f0/playlist.m3u8",
+  poster:""
+ },
+
+ WCC:{
+  url:"https://live-en.aisports.cc/moviebox/device01/playlist.m3u8",
+  poster:"https://nirutv.online/logo/image.png"
+ },
+
+ ACC:{
+  url:"https://live-en.aisports.cc/moviebox/device01/playlist.m3u8",
+  poster:"https://img.jagranjosh.com/images/2025/09/27/article/image/Untitled-design-(73)-1758966052512.webp"
+ }
+
 };
-const video=document.querySelector("#video"),statusEl=document.querySelector("#status"),detail=document.querySelector("#detail"),logEl=document.querySelector("#log");
-const buttons={};let hls=null,current=null,timer=null,hasData=false;
-if(location.protocol==="file:")document.querySelector("#originWarning").hidden=false;
-function status(label,msg){statusEl.textContent=label;detail.textContent=msg;logEl.textContent=label+" — "+msg}
-function mark(id,value){if(buttons[id])buttons[id].querySelector(".state").textContent=value}
-function stopPlayer(){clearTimeout(timer);if(hls){hls.destroy();hls=null}video.pause();video.removeAttribute("src");video.load();hasData=false}
-function playable(){if(hasData)return;hasData=true;clearTimeout(timer);status("PLAYABLE","The player received video data. Press play if playback did not start automatically.");mark(current,"Playable")}
-function fail(label,msg){clearTimeout(timer);status(label,msg);if(current)mark(current,label)}
-function play(id){
- current=id;stopPlayer();const item=streamMap[id];document.querySelector("#selected").textContent=id;
- Object.values(buttons).forEach(b=>b.classList.toggle("active",b.dataset.id===id));
- if(item.poster)video.poster=item.poster;else video.removeAttribute("poster");
- mark(id,"Loading…");status("LOADING","Connecting to playlist. Waiting up to 20 seconds…");
- timer=setTimeout(()=>{if(!hasData)fail("TIMEOUT","No video data arrived within 20 seconds. Source may be offline, slow, expired, or blocked by CORS.")},20000);
- if(window.Hls&&Hls.isSupported()){
-   hls=new Hls({debug:false,enableWorker:true,manifestLoadingTimeOut:12000,levelLoadingTimeOut:12000,fragLoadingTimeOut:15000});
-   hls.on(Hls.Events.MEDIA_ATTACHED,()=>hls.loadSource(item.url));
-   hls.on(Hls.Events.MANIFEST_PARSED,()=>{
-     status("PLAYLIST OK","Playlist parsed. Waiting for video segments…");
-     video.play().catch(()=>{status("PLAYLIST OK","Playlist loaded. Tap the video Play button; autoplay may be blocked.")});
-   });
-   hls.on(Hls.Events.FRAG_BUFFERED,playable);
-   hls.on(Hls.Events.ERROR,(_,data)=>{
-     const reason=(data.details||data.type||"Unknown HLS error")+"; "+(data.response?.code?"HTTP "+data.response.code:"");
-     logEl.textContent="HLS "+(data.fatal?"fatal":"warning")+" error: "+reason;
-     if(!data.fatal)return;
-     if(data.type===Hls.ErrorTypes.NETWORK_ERROR){
-       fail("NETWORK / CORS",reason+" The browser could not fetch the playlist or segments. Check server access and CORS headers.");
-     }else if(data.type===Hls.ErrorTypes.MEDIA_ERROR){
-       status("RECOVERING","Trying to recover a media decoding error…");hls.recoverMediaError();
-     }else fail("HLS ERROR",reason);
-   });
-   hls.attachMedia(video);
- }else if(video.canPlayType("application/vnd.apple.mpegurl")){
-   video.src=item.url;
-   video.addEventListener("loadedmetadata",()=>{status("PLAYLIST OK","Native HLS playlist loaded. Tap Play if needed.");video.play().catch(()=>{})},{once:true});
-   video.addEventListener("playing",playable,{once:true});
-   video.addEventListener("error",()=>fail("BROWSER ERROR","Native HLS playback failed. The stream may be unavailable or blocked."),{once:true});
- }else fail("UNSUPPORTED","This browser does not support HLS playback. Try current Chrome or Safari.");
+
+
+// PLAYER VARIABLES
+
+const video=document.getElementById("video");
+const statusEl=document.getElementById("status");
+const message=document.getElementById("message");
+const log=document.getElementById("log");
+
+let hls=null;
+let currentChannel=null;
+let timeout=null;
+let playing=false;
+
+
+// UI STATUS
+
+function updateStatus(status,text){
+
+ statusEl.textContent=status;
+ message.textContent=text;
+ log.textContent=status+": "+text;
+
 }
-Object.keys(streamMap).forEach(id=>{const b=document.createElement("button");b.dataset.id=id;b.innerHTML=id+'<span class="state">Not tested</span>';b.onclick=()=>play(id);buttons[id]=b;document.querySelector("#channels").appendChild(b)});
-document.querySelector("#retry").onclick=()=>{if(current)play(current);else status("IDLE","Select a channel first.")};
-document.querySelector("#stop").onclick=()=>{stopPlayer();status("STOPPED","Playback stopped.")};
-video.addEventListener("playing",playable);
-video.addEventListener("error",()=>{if(current&&!hasData)fail("VIDEO ERROR","The browser reported a video playback error.")});
-</script></body></html>
+
+
+// STOP PLAYER
+
+function stopPlayer(){
+
+ clearTimeout(timeout);
+
+ if(hls){
+  hls.destroy();
+  hls=null;
+ }
+
+ video.pause();
+ video.removeAttribute("src");
+ video.load();
+
+ playing=false;
+
+ updateStatus("STOPPED","Playback stopped.");
+
+}
+
+
+// PLAY CHANNEL
+
+function playChannel(id){
+
+ const channel=streamMap[id];
+
+ if(!channel){
+  updateStatus("ERROR","Channel not found.");
+  return;
+ }
+
+ currentChannel=id;
+
+ stopPlayer();
+
+ document.getElementById("channelName").textContent=id;
+
+ document.querySelectorAll(".channel").forEach(btn=>{
+  btn.classList.toggle("active",btn.dataset.id===id);
+ });
+
+ if(channel.poster){
+  video.poster=channel.poster;
+ }else{
+  video.removeAttribute("poster");
+ }
+
+ updateStatus("CONNECTING","Connecting to stream: "+id);
+
+ timeout=setTimeout(()=>{
+
+  if(!playing){
+   updateStatus(
+    "TIMEOUT",
+    "No playable video received. The provider may be unavailable or blocking access."
+   );
+  }
+
+ },20000);
+
+
+ // HLS.JS PLAYBACK
+
+ if(window.Hls && Hls.isSupported()){
+
+  hls=new Hls({
+   enableWorker:true,
+   debug:false,
+   manifestLoadingTimeOut:12000,
+   levelLoadingTimeOut:12000,
+   fragLoadingTimeOut:15000
+  });
+
+  hls.on(Hls.Events.MEDIA_ATTACHED,()=>{
+
+   hls.loadSource(channel.url);
+
+  });
+
+
+  hls.on(Hls.Events.MANIFEST_PARSED,()=>{
+
+   updateStatus(
+    "PLAYLIST OK",
+    "Playlist loaded. Waiting for video segments."
+   );
+
+   video.play().catch(()=>{
+
+    updateStatus(
+     "READY",
+     "Playlist loaded. Press the video play button."
+    );
+
+   });
+
+  });
+
+
+  hls.on(Hls.Events.FRAG_BUFFERED,()=>{
+
+   markPlayable();
+
+  });
+
+
+  hls.on(Hls.Events.ERROR,(event,data)=>{
+
+   if(!data.fatal){
+
+    log.textContent="HLS warning: "+data.details;
+    return;
+
+   }
+
+   clearTimeout(timeout);
+
+   const code=data.response?.code || "Unknown";
+   const details=data.details || data.type;
+
+   if(data.type===Hls.ErrorTypes.NETWORK_ERROR){
+
+    updateStatus(
+     "NETWORK ERROR",
+     "Could not fetch stream. HTTP status: "+code+
+     ". Check provider availability and CORS permissions."
+    );
+
+   }
+
+   else if(data.type===Hls.ErrorTypes.MEDIA_ERROR){
+
+    updateStatus(
+     "RECOVERING",
+     "Trying to recover media decoding error."
+    );
+
+    hls.recoverMediaError();
+
+   }
+
+   else{
+
+    updateStatus(
+     "PLAYBACK ERROR",
+     details
+    );
+
+   }
+
+  });
+
+
+  hls.attachMedia(video);
+
+ }
+
+ // NATIVE HLS
+
+ else if(video.canPlayType("application/vnd.apple.mpegurl")){
+
+  video.src=channel.url;
+
+  video.addEventListener("loadedmetadata",()=>{
+
+   updateStatus(
+    "PLAYLIST OK",
+    "Native HLS playlist loaded."
+   );
+
+   video.play().catch(()=>{});
+
+  },{once:true});
+
+  video.addEventListener("playing",markPlayable,{once:true});
+
+  video.addEventListener("error",()=>{
+
+   updateStatus(
+    "ERROR",
+    "Browser could not play this stream."
+   );
+
+  },{once:true});
+
+ }
+
+ else{
+
+  clearTimeout(timeout);
+
+  updateStatus(
+   "UNSUPPORTED",
+   "This browser does not support HLS."
+  );
+
+ }
+
+}
+
+
+// PLAYABLE STATUS
+
+function markPlayable(){
+
+ if(playing)return;
+
+ playing=true;
+ clearTimeout(timeout);
+
+ updateStatus(
+  "PLAYABLE",
+  "Video data successfully reached the player."
+ );
+
+}
+
+video.addEventListener("playing",markPlayable);
+
+
+// RETRY
+
+function retry(){
+
+ if(currentChannel){
+  playChannel(currentChannel);
+ }
+
+}
+
+
+// FULLSCREEN
+
+function fullscreen(){
+
+ if(video.requestFullscreen){
+  video.requestFullscreen();
+ }else if(video.webkitEnterFullscreen){
+  video.webkitEnterFullscreen();
+ }
+
+}
+
+
+// CREATE CHANNEL BUTTONS
+
+const grid=document.getElementById("channelGrid");
+
+Object.keys(streamMap).forEach(id=>{
+
+ const button=document.createElement("button");
+
+ button.className="channel";
+ button.dataset.id=id;
+ button.textContent=id;
+
+ button.onclick=()=>playChannel(id);
+
+ grid.appendChild(button);
+
+});
+
+
+// INITIAL STATUS
+
+updateStatus(
+ "READY",
+ "Select a channel to test playback."
+);
+
+</script>
+
+</body>
+</html>
