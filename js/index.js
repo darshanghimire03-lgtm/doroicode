@@ -25,7 +25,10 @@ if (headerExtra) {
   headerExtra.innerHTML = '<div class="live-pill" id="livePill"><span class="dot"></span><span id="liveCount">LIVE</span></div>';
 }
 
-const LIVE_MS = (4 * 60 + 30) * 60 * 1000;
+function liveEnd(m) {
+  const h = Number(m.durationHours);
+  return h > 0 ? m.startTime + h * 3600000 : Infinity;
+}
 const homeMain = document.getElementById("homeMain");
 const livePill = document.getElementById("livePill") || document.createElement("div");
 const liveCount = document.getElementById("liveCount") || document.createElement("span");
@@ -163,7 +166,7 @@ function getInfo(m, now) {
   const dayDiff = dayNumber(start) - dayNumber(now);
   let state;
   if (now < start) state = "notstarted";
-  else if (m.ended !== true && now < start + LIVE_MS) state = "live";
+  else if (m.ended !== true && now < liveEnd(m)) state = "live";
   else state = "ended";
 
   let group = "today";

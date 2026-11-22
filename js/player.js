@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-import { getDatabase, ref, set, onValue, remove, onDisconnect, serverTimestamp, query, orderByChild, startAt, limitToFirst } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+import { getDatabase, ref, set, onValue, remove, onDisconnect, serverTimestamp, query, orderByChild, limitToLast } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
 import { ENV } from "/env.js";
 import { mountLayout, loadPartial, fillTemplate } from "/js/layout.js";
 import { logoImg, normalizeImgUrl, bgImg } from "/js/img.js";
@@ -18,14 +18,17 @@ try {
 }
 
 const LINK_COUNT = 8;
-const LIVE_MS = (4 * 60 + 30) * 60 * 1000;
+function liveEnd(m) {
+  const h = Number(m.durationHours);
+  return h > 0 ? m.startTime + h * 3600000 : Infinity;
+}
 const BEAT_MS = 20000;
 const ACTIVE_MS = 90000;
 const PRUNE_MS = 180000;
 const COUNTDOWN_MS = 3000;
 const NEXT_MAX = 12;
-const NEXT_FETCH = 40;
-const MATCH_FIELDS = ["startTime", "team1", "team2", "title", "ended", "links"];
+const NEXT_FETCH = 60;
+const MATCH_FIELDS = ["startTime", "team1", "team2", "title", "ended", "durationHours", "links"];
 const HLS_SRC = "https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js";
 const SHAKA_SRC = "https://cdn.jsdelivr.net/npm/shaka-player@4.7.11/dist/shaka-player.compiled.js";
 const WA_URL = "https://whatsapp.com/channel/0029Vb8vBWZ6WaKmmQZnWX3o";
@@ -393,7 +396,7 @@ function formatDateTime(ms) {
 
 function getState(m, now) {
   if (now < m.startTime) return "notstarted";
-  if (m.ended !== true && now < m.startTime + LIVE_MS) return "live";
+  if (m.ended !== true && now < liveEnd(m)) return "live";
   return "ended";
 }
 
@@ -926,6 +929,7 @@ function listenMatch() {
         team2: parts.team2,
         title: parts.title,
         ended: parts.ended,
+        durationHours: parts.durationHours,
         links: parts.links
       };
     } else if (!(match && getState(match, nowMs()) === "ended")) {
@@ -963,7 +967,7 @@ if (!matchId) {
   }, onError);
 
   onValue(
-    query(ref(db, "matches"), orderByChild("startTime"), startAt(Date.now() - LIVE_MS), limitToFirst(NEXT_FETCH)),
+    query(ref(db, "matches"), orderByChild("startTime"), limitToLast(NEXT_FETCH)),
     (snap) => {
       const next = {};
       snap.forEach((child) => {

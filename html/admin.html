@@ -15,25 +15,12 @@
 <div data-include="header" data-max="1100px" data-compact data-back></div>
 
 <main>
-  <nav class="tabs" id="tabs" aria-label="Admin sections">
-    <button class="tab active" type="button" data-tab="matches">Matches <small id="cMatches">0</small></button>
-    <button class="tab" type="button" data-tab="teams">Teams <small id="cTeams">0</small></button>
-  </nav>
-
   <section id="matchesPane">
     <div class="toolbar">
       <input class="search" id="matchSearch" type="search" placeholder="Search matches" autocomplete="off">
       <button class="btn primary" type="button" id="addMatch">+ Add match</button>
     </div>
     <div class="list" id="matchList"><div class="empty">Loading...</div></div>
-  </section>
-
-  <section id="teamsPane" hidden>
-    <div class="toolbar">
-      <input class="search" id="teamSearch" type="search" placeholder="Search teams" autocomplete="off">
-      <button class="btn primary" type="button" id="addTeam">+ Add team</button>
-    </div>
-    <div class="list" id="teamList"><div class="empty">Loading...</div></div>
   </section>
 </main>
 

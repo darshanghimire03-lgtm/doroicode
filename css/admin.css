@@ -191,6 +191,7 @@ main {
 .links-box { display: grid; gap: 8px; margin-bottom: 14px; }
 .logo-edit { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
 .logo-edit .field { flex: 1; margin: 0; }
+.team-block { margin-bottom: 4px; padding-bottom: 6px; border-bottom: 1px dashed var(--line); }
 .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
 .err { color: #FF6B6B; font-size: 0.82rem; font-weight: 700; margin-bottom: 10px; min-height: 1em; }
 @media (min-width: 560px) {

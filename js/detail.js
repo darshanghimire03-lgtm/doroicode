@@ -12,7 +12,10 @@ await mountLayout();
 document.getElementById("headerExtra").innerHTML = '<button class="share-btn" id="shareBtn" type="button" hidden aria-label="Share match"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/><line x1="15.4" y1="6.5" x2="8.6" y2="10.5"/></svg><span>Share</span></button>';
 
 const LINK_COUNT = 8;
-const LIVE_MS = (4 * 60 + 30) * 60 * 1000;
+function liveEnd(m) {
+  const h = Number(m.durationHours);
+  return h > 0 ? m.startTime + h * 3600000 : Infinity;
+}
 const detail = document.getElementById("detail");
 const shareBtn = document.getElementById("shareBtn");
 const toastEl = document.getElementById("toast");
@@ -164,7 +167,7 @@ function getInfo(m, now) {
   const dayDiff = dayNumber(start) - dayNumber(now);
   let state;
   if (now < start) state = "notstarted";
-  else if (m.ended !== true && now < start + LIVE_MS) state = "live";
+  else if (m.ended !== true && now < liveEnd(m)) state = "live";
   else state = "ended";
 
   let group = "today";
